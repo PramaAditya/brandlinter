@@ -71,6 +71,15 @@ Drop this into your MCP config (**Antigravity**, **OMP**, **Claude Desktop / Cla
 
 > Want zero-key mode? Omit `env` completely. Prefer another backend? Swap `OPENSERP_URL` for `SEARXNG_URL`, `SERPER_API_KEY`, `BRAVE_API_KEY`, `GOOGLE_CSE_API_KEY` + `GOOGLE_CSE_CX`, or `EXA_API_KEY`.
 
+| Client | Typical MCP Config Path |
+| :--- | :--- |
+| **Antigravity** | `~/.gemini/config/mcp_config.json` |
+| **OMP** | `~/.omp/agent/mcp.json` |
+| **Cursor** | `~/.cursor/mcp.json` |
+| **Claude Desktop** | `claude_desktop_config.json` |
+
+> **Windows note:** If your MCP host does not resolve `npx` directly, use `"command": "cmd.exe"` with `"args": ["/d", "/c", "npx", "-y", "brandlinter@latest", "mcp"]`.
+
 ### 2. Install the Agent Skill
 
 Adding the MCP server gives your agent the tools; installing [`skills/brandlinter/SKILL.md`](skills/brandlinter/SKILL.md) teaches it *how to think about naming* (avoiding generic compounds and dictionary traps, batching 20–30 ideas into Stage 1, and only promoting finalists to Stage 2).
