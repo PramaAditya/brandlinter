@@ -10,7 +10,8 @@ export function formatStage1Markdown(results: AvailabilityResult[]): string {
   if (results.length === 0) return "No candidates checked.";
   const tlds = results[0].domains.map((d) => `.${d.tld}`);
   const regs = results[0].registries.map((r) => r.registry);
-  const headers = ["Name", "Prelim", "GH Org", "GH Top Repo", ...tlds, ...regs];
+  const hasApps = results.some((r) => (r.apps?.length ?? 0) > 0);
+  const headers = ["Name", "Prelim", "GH Org", "GH Top Repo", ...tlds, ...regs, ...(hasApps ? ["App Store"] : [])];
   const lines = [
     `| ${headers.join(" | ")} |`,
     `| ${headers.map(() => "---").join(" | ")} |`,
@@ -25,7 +26,14 @@ export function formatStage1Markdown(results: AvailabilityResult[]): string {
         : "0 repos";
     const domCols = r.domains.map((d) => fmtStatus(d.status));
     const regCols = r.registries.map((reg) => fmtStatus(reg.status));
-    lines.push(`| ${[r.name, String(r.preliminaryScore), ghOrg, ghTop, ...domCols, ...regCols].join(" | ")} |`);
+    const appCol = r.apps?.map((app) => {
+      if (app.status === "taken") return "TAKEN";
+      if (app.nearMatches?.length) return `NEAR: ${app.nearMatches.slice(0, 2).join(", ")}`;
+      return fmtStatus(app.status);
+    });
+    lines.push(
+      `| ${[r.name, String(r.preliminaryScore), ghOrg, ghTop, ...domCols, ...regCols, ...(appCol ?? [])].join(" | ")} |`
+    );
   }
   return lines.join("\n");
 }

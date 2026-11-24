@@ -50,4 +50,15 @@ flowchart TB
 | **Phase 2** | Pluggable SERP Providers (`openserp`, `searxng`, `serper`, `brave`, `exa`, `ddg`) & Scorer (`seo`, `lint`) | `done` | [20261124_121002_phase2_serp_providers_scorer.md](.kanban/20261124_121002_phase2_serp_providers_scorer.md) |
 | **Phase 3** | MCP Server (`stdio`), `SKILL.md`, & Opt-In Extensions (`porkbun`, `appstores`, `social`, `trademark`) | `done` | [20261124_121003_phase3_mcp_skill_extensions.md](.kanban/20261124_121003_phase3_mcp_skill_extensions.md) |
 | **Phase 4** | `README.md`, GitHub Actions CI & npm Provenance Release | `done` | [20261124_121004_phase4_docs_oss_release.md](.kanban/20261124_121004_phase4_docs_oss_release.md) |
-| **Phase 5** | v0.2.0: Real-World Ergonomics (`SKILL.md` gate, SERP failover, compact MCP, Exa keyword, App Store & near-miss) | `todo` | [20261124_135001_phase5_v0_2_real_world_ergonomics.md](.kanban/20261124_135001_phase5_v0_2_real_world_ergonomics.md) |
+| **Phase 5** | v0.2.0: Real-World Ergonomics (`SKILL.md` gate, SERP failover, compact MCP, Exa keyword, App Store & near-miss) | `done` | [20261124_135001_phase5_v0_2_real_world_ergonomics.md](.kanban/20261124_135001_phase5_v0_2_real_world_ergonomics.md) |
+
+---
+
+## 5. v0.2.0 Behavioral Notes
+
+- **Provider chain:** `resolveSerpProviderChain()` returns every configured provider in preference order plus DuckDuckGo, so `auto` mode can fail over. `searchWithFailover()` retries transient errors once, then advances, and keeps a batch-scoped cursor so later candidates never re-probe a dead provider. An explicit provider stays a single-entry chain.
+- **SERP-only verdict:** `analyzeSerpResults()` and `summarizeSerpVerdict()` are the single source of truth for `exactDomainInSerp`, `nearDomainMatches`, `dictionaryTrap`, and `seoVerdict`; both `scoreCandidate()` and the compact MCP formatter read them, so CLI and MCP can never disagree.
+- **Near-miss signals:** page-1 second-level labels that share a prefix/suffix with candidates of 5+ characters count as `nearDomainMatches` (-15, forces `CAUTION`); App Store titles within one edit or sharing the prefix count as `appStoreNearMatches` (-15). This catches `localscreenshare.com` for `localscreen` and `TapSpan` for `Tabspan`.
+- **Compact MCP payloads:** `src/mcp/format.ts` projects results to status maps, verdicts, and top hits (5 exact / 3 niche); `verbose: true` returns the raw payload. This keeps a 10-name SEO batch near 3 KB instead of spilling to a log artifact.
+- **Exa is keyword-only:** exact-name collision checks need pages that literally contain the token; Exa's neural mode returned semantic neighbours (Stack Overflow "tab-width" for `tabspan`).
+- **RDAP direct routes:** `.dev`/`.app` go to Google Registry (`pubapi.registry.google`), which answers authoritatively without the `rdap.org` redirect and 403 hop. All RDAP calls send an explicit `User-Agent`.

@@ -82,7 +82,7 @@ Drop this into your MCP config (**Antigravity**, **OMP**, **Claude Desktop / Cla
 
 ### 2. Install the Agent Skill
 
-Adding the MCP server gives your agent the tools; installing [`skills/brandlinter/SKILL.md`](skills/brandlinter/SKILL.md) teaches it *how to think about naming* (avoiding generic compounds and dictionary traps, batching 20–30 ideas into Stage 1, and only promoting finalists to Stage 2).
+Adding the MCP server gives your agent the tools; installing [`skills/brandlinter/SKILL.md`](skills/brandlinter/SKILL.md) teaches it *how and when* to use them: it stays in a **brainstorm phase** (no tool calls, working from real user language such as a forum thread) until you ask to verify, then runs the two-stage funnel, batches `lint_seo` in a single call, and reports the built-in verdicts instead of re-deriving them.
 
 ```bash
 # Option A: via skills.sh / Vercel Agent Skills
@@ -107,8 +107,13 @@ Start free, and upgrade individual layers whenever you want higher accuracy or t
 | **Domains** | `rdap` (direct registry + DoH corroboration) | — | `porkbun` (opt-in) |
 | **Code & Packages** | GitHub (public), `npm`, `PyPI` (PEP 503), `crates.io` | — | `GITHUB_TOKEN` (higher search rate limits) |
 
-When `BRANDLINTER_SERP_PROVIDER=auto` (default), `brandlinter` picks the strongest configured SERP provider automatically:
+When `BRANDLINTER_SERP_PROVIDER=auto` (default), `brandlinter` walks the configured SERP providers in order and **automatically fails over** when one errors:
 `openserp` → `searxng` → `serper` → `brave` → `google-cse` → `exa` → `duckduckgo`.
+
+- Transient failures (`HTTP 429/500/502/503/504`, timeouts, connection resets) are retried once, then the batch moves to the next provider.
+- Later candidates in the same batch skip the provider that already failed, so an outage costs one probe, not one per name.
+- Every SERP result reports `provider` plus `fallbackFrom` so you can see exactly where an answer came from.
+- An explicit `--provider exa` (or `BRANDLINTER_SERP_PROVIDER=exa`) stays strict: no silent substitution.
 
 See [`.env.example`](.env.example) for all configuration variables.
 
@@ -127,7 +132,25 @@ See [`.env.example`](.env.example) for all configuration variables.
 | `brandlinter install-skill` | Copy the bundled `SKILL.md` to `agents`, `claude`, `omp`, or `cursor` |
 | `brandlinter doctor` | Inspect resolved providers, config warnings, and probe self-hosted endpoints |
 
-Common flags: `--tlds com,dev,io,org`, `--registries npm,pypi,crates`, `--niche "keywords"`, `--provider auto|openserp|...`, `--top-k 5`, `--format table|markdown|json`, `--json`.
+Common flags: `--tlds com,dev,io,org`, `--registries npm,pypi,crates`, `--niche "keywords"`, `--provider auto|openserp|...`, `--apps` (Apple App Store, exact + near/phonetic), `--social` (X, YouTube, Reddit, Bluesky, LinkedIn), `--top-k 5`, `--format table|markdown|json`, `--json`.
+
+### MCP Response Shape
+
+MCP tools return a **compact signal summary** by default (a 10-name SEO batch stays around 3 KB instead of dumping raw SERP JSON):
+
+| Field | Meaning |
+| :--- | :--- |
+| `verdict` / `seoVerdict` | `CLEAN`, `CAUTION`, `CONFLICT`, or `UNVERIFIED` |
+| `exactDomainInSerp` | A `{name}.{tld}` registrar domain literally owns a page-1 slot |
+| `nearDomainMatches` | Registrar twins on page 1 (`localscreenshare.com` for `localscreen`) |
+| `dictionaryTrap` | Wikipedia/Merriam-Webster dominate the top 3 |
+| `appStoreNearMatches` | App Store titles one edit away (`TapSpan` for `Tabspan`) |
+| `top` / `nicheTop` | Top 5 exact hits and top 3 niche hits (`rank`, `domain`, `title`) |
+| `fallbackFrom` | Present when the response came from a backup SERP provider |
+
+Need the raw provider payloads (full SERP items, per-domain `detail`, exact repo URLs)? Pass `verbose: true` to any MCP tool.
+
+Note: App Store near-match detection depends on Apple's own search recall. For finalists, a single `site:apps.apple.com` web search is still a cheap sanity check.
 
 ---
 

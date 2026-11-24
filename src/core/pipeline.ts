@@ -7,7 +7,9 @@ import { checkGitHub } from "../providers/ecosystem/github.js";
 import { checkNpm } from "../providers/ecosystem/npm.js";
 import { checkPypi } from "../providers/ecosystem/pypi.js";
 import { checkCrates } from "../providers/ecosystem/crates.js";
-import { resolveSerpProvider } from "../providers/serp/resolver.js";
+import { resolveSerpProviderChain, searchWithFailover, type FailoverState } from "../providers/serp/resolver.js";
+import { checkAppStore, type AppStoreCheckResult } from "../providers/optional/appstores.js";
+import { checkSocialHandles, type SocialCheckResult } from "../providers/optional/social.js";
 import type {
   DomainCheckResult,
   GitHubCheckResult,
@@ -22,6 +24,10 @@ export interface AvailabilityResult {
   domains: DomainCheckResult[];
   github: GitHubCheckResult;
   registries: RegistryCheckResult[];
+  /** Present only when `includeApps` was requested. */
+  apps?: AppStoreCheckResult[];
+  /** Present only when `includeSocial` was requested. */
+  social?: SocialCheckResult[];
   preliminaryScore: number;
 }
 
@@ -31,6 +37,8 @@ export interface SeoCheckResult {
   confidence: "high" | "medium" | "low";
   exactResults: SerpItem[];
   nicheResults: SerpItem[];
+  /** Set when the batch failed over from another provider (e.g. "openserp" -> "exa"). */
+  fallbackFrom?: string;
   exactError?: string;
   nicheError?: string;
   error?: string;
@@ -44,7 +52,12 @@ export interface FullLintResult extends AvailabilityResult {
 export async function runAvailabilityCheck(
   rawCandidates: string[],
   cfg: BrandlinterConfig,
-  options?: { tlds?: string[]; registries?: RegistryId[] }
+  options?: {
+    tlds?: string[];
+    registries?: RegistryId[];
+    includeApps?: boolean;
+    includeSocial?: boolean;
+  }
 ): Promise<AvailabilityResult[]> {
   const candidates = sanitizeCandidates(rawCandidates);
   const tlds = (options?.tlds ?? ["com", "dev", "io", "org"]).map(sanitizeTld);
@@ -54,7 +67,7 @@ export async function runAvailabilityCheck(
   return Promise.all(
     candidates.map((name) =>
       sem.run(async () => {
-        const [domains, github, regResults] = await Promise.all([
+        const [domains, github, regResults, apps, social] = await Promise.all([
           Promise.all(tlds.map((tld) => checkDomain(name, tld, cfg.dohUrl))),
           checkGitHub(name, cfg.githubToken),
           Promise.all(
@@ -64,12 +77,18 @@ export async function runAvailabilityCheck(
               return checkCrates(name);
             })
           ),
+          options?.includeApps
+            ? Promise.all([checkAppStore(name, cfg.country)])
+            : Promise.resolve(undefined),
+          options?.includeSocial ? checkSocialHandles(name) : Promise.resolve(undefined),
         ]);
         const prelim = scoreCandidate({
           name,
           domains,
           github,
           registries: regResults,
+          apps,
+          social,
           serpResults: [],
         });
         const unknownCount =
@@ -81,6 +100,8 @@ export async function runAvailabilityCheck(
           domains,
           github,
           registries: regResults,
+          ...(apps ? { apps } : {}),
+          ...(social ? { social } : {}),
           preliminaryScore: Math.max(0, prelim.score - unknownCount * 5),
         };
       })
@@ -94,28 +115,31 @@ export async function runSeoCheck(
   options?: { nicheKeywords?: string[]; provider?: SerpProviderId; limit?: number }
 ): Promise<SeoCheckResult[]> {
   const candidates = sanitizeCandidates(rawCandidates);
-  const provider = resolveSerpProvider(cfg, options?.provider);
-  const concurrency = provider.id === "openserp" || provider.id === "duckduckgo" ? 2 : 4;
+  const chain = resolveSerpProviderChain(cfg, options?.provider);
+  const primaryId = chain[0].id;
+  const concurrency = primaryId === "openserp" || primaryId === "duckduckgo" ? 2 : 4;
   const sem = new Semaphore(concurrency);
   const limit = options?.limit ?? 8;
   const niche = options?.nicheKeywords?.filter(Boolean).join(" ").trim();
+  const failover: FailoverState = { index: 0 };
 
   return Promise.all(
     candidates.map((name) =>
       sem.run(async () => {
-        const exact = await provider.search(`"${name}"`, limit);
+        const exact = await searchWithFailover(chain, failover, `"${name}"`, limit);
         const nicheRes = niche
-          ? await provider.search(`"${name}" ${niche}`, Math.min(limit, 5))
-          : { results: [] as SerpItem[], error: undefined };
+          ? await searchWithFailover(chain, failover, `"${name}" ${niche}`, Math.min(limit, 5))
+          : undefined;
         return {
           name,
-          provider: provider.id,
-          confidence: exact.confidence,
-          exactResults: exact.results,
-          nicheResults: nicheRes.results,
-          exactError: exact.error,
-          nicheError: nicheRes.error,
-          error: exact.error ?? nicheRes.error,
+          provider: exact.providerId,
+          confidence: exact.result.confidence,
+          exactResults: exact.result.results,
+          nicheResults: nicheRes?.result.results ?? [],
+          fallbackFrom: exact.fallbackFrom ?? nicheRes?.fallbackFrom,
+          exactError: exact.result.error,
+          nicheError: nicheRes?.result.error,
+          error: exact.result.error ?? nicheRes?.result.error,
         };
       })
     )
@@ -131,6 +155,8 @@ export async function runFullLint(
     nicheKeywords?: string[];
     provider?: SerpProviderId;
     topK?: number;
+    includeApps?: boolean;
+    includeSocial?: boolean;
   }
 ): Promise<FullLintResult[]> {
   const topK = options?.topK ?? 5;
@@ -141,6 +167,8 @@ export async function runFullLint(
   const stage1 = await runAvailabilityCheck(rawCandidates, cfg, {
     tlds: options?.tlds,
     registries: options?.registries,
+    includeApps: options?.includeApps,
+    includeSocial: options?.includeSocial,
   });
 
   const shortlisted = [...stage1]
@@ -161,6 +189,8 @@ export async function runFullLint(
       domains: item.domains,
       github: item.github,
       registries: item.registries,
+      apps: item.apps,
+      social: item.social,
       serpResults: seo?.exactResults ?? [],
       nicheResults: seo?.nicheResults ?? [],
       serpChecked: Boolean(seo),

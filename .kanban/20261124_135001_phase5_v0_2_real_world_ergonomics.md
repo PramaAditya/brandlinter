@@ -31,3 +31,11 @@ tags:
 - [ ] **Red -> Green (Exa Keyword & RDAP Speed):** Switch Exa exact queries to `type: "keyword"` and optimize `.dev`/`.app` RDAP handling (avoid repeated 403 fallback latency) with unit tests.
 - [ ] **Red -> Green (Compact MCP + SEO Verdict):** Return `seoVerdict` + compact Top 5 summary from `lint_seo` / `lint_availability` / `lint_names` (`verbose?: boolean` opt-in) with schema & payload-size tests.
 - [ ] **Red -> Green (Near-Miss & App Stores Wiring):** Wire `includeApps` / `includeSocial` into CLI & MCP, and add prefix-domain + Levenshtein `<= 1` phonetic near-miss warnings in `scorer.ts`.
+
+## Verification (2026-11-24)
+
+- `npx tsc --noEmit` clean; `npx vitest run` 104 tests passing across 12 files (new: `tests/serp-failover.test.ts`, `tests/near-miss-and-compact.test.ts`).
+- Live failover: `OPENSERP_URL=https://openserp.invalid node dist/cli.js seo sideslate --json` returned `provider: "exa"`, `fallbackFrom: "openserp"`.
+- Live MCP `lint_names` (2 candidates, `includeApps`, niche keywords) returned a 2,943-byte compact payload with `seoVerdict`, `verdict`, and `fallbackFrom`. The same run proved the real self-hosted OpenSERP was answering `HTTP 502` (`curl /mega/search` confirmed), so failover handled an actual outage.
+- RDAP: `pubapi.registry.google` answered `.dev` 404 / `.app` 200 directly; Exa `type: "keyword"` returned zero results for `"tabspan"` instead of Stack Overflow `tab-width` noise.
+- Known limit: App Store near-match recall depends on Apple's search API; iTunes does not surface `TapSpan` for the query `tabspan`, so the skill still recommends one `site:apps.apple.com` check for finalists.

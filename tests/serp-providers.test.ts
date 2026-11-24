@@ -157,6 +157,21 @@ describe("SERP provider adapters", () => {
     expect(res.results[0].domain).toBe("exa.ai");
   });
 
+  it("exa requests keyword mode so neural neighbours cannot mask collisions", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ results: [] }), { status: 200 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const p = createExaProvider("key");
+    await p.search('"tabspan"', 5);
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body)) as {
+      type?: string;
+      query?: string;
+    };
+    expect(body.type).toBe("keyword");
+    expect(body.query).toBe('"tabspan"');
+  });
+
   it("duckduckgo parses HTML lite and marks confidence low", async () => {
     vi.stubGlobal(
       "fetch",

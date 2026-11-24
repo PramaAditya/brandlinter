@@ -8,19 +8,31 @@ import {
   runSeoCheck,
   type RegistryId,
 } from "../core/pipeline.js";
+import { toCompactAvailability, toCompactFullLint, toCompactSeo } from "./format.js";
+
+const serpProviderSchema = z
+  .enum(["auto", "openserp", "searxng", "serper", "brave", "google-cse", "exa", "duckduckgo"])
+  .optional();
+
+const verboseSchema = z
+  .boolean()
+  .optional()
+  .describe("Return the full raw provider payloads instead of the compact signal summary (default: false)");
 
 export const LintAvailabilityInputSchema = z.object({
   candidates: z.array(z.string()).min(1).max(30),
   tlds: z.array(z.string()).optional(),
   registries: z.array(z.enum(["npm", "pypi", "crates"])).optional(),
+  includeApps: z.boolean().optional().describe("Also check the Apple App Store for exact and near/phonetic name collisions"),
+  includeSocial: z.boolean().optional().describe("Also check X, YouTube, Reddit, Bluesky, and LinkedIn handles"),
+  verbose: verboseSchema,
 });
 
 export const LintSeoInputSchema = z.object({
   candidates: z.array(z.string()).min(1).max(10),
   nicheKeywords: z.array(z.string()).optional(),
-  provider: z
-    .enum(["auto", "openserp", "searxng", "serper", "brave", "google-cse", "exa", "duckduckgo"])
-    .optional(),
+  provider: serpProviderSchema,
+  verbose: verboseSchema,
 });
 
 export const LintNamesInputSchema = z.object({
@@ -29,56 +41,74 @@ export const LintNamesInputSchema = z.object({
   topK: z.number().int().min(1).max(10).optional(),
   tlds: z.array(z.string()).optional(),
   registries: z.array(z.enum(["npm", "pypi", "crates"])).optional(),
-  provider: z
-    .enum(["auto", "openserp", "searxng", "serper", "brave", "google-cse", "exa", "duckduckgo"])
-    .optional(),
+  includeApps: z.boolean().optional().describe("Also check the Apple App Store for exact and near/phonetic name collisions"),
+  includeSocial: z.boolean().optional().describe("Also check X, YouTube, Reddit, Bluesky, and LinkedIn handles"),
+  provider: serpProviderSchema,
+  verbose: verboseSchema,
 });
 
 export function createBrandlinterMcpServer(): McpServer {
-  const server = new McpServer({ name: "brandlinter", version: "0.1.0" });
+  const server = new McpServer({ name: "brandlinter", version: "0.2.0" });
 
   server.tool(
     "lint_availability",
-    "Stage 1 fast batch screen (up to 30 candidates) across domains (DoH/RDAP), GitHub org/repos, and package registries (npm, PyPI, crates.io).",
+    "Stage 1 fast batch screen (up to 30 candidates) across domains (DoH/RDAP), GitHub org/repos, package registries (npm, PyPI, crates.io), and optionally the App Store/social handles. Compact results by default; pass verbose:true for raw payloads.",
     LintAvailabilityInputSchema.shape,
-    async ({ candidates, tlds, registries }) => {
+    async ({ candidates, tlds, registries, includeApps, includeSocial, verbose }) => {
       const cfg = resolveConfig();
       const results = await runAvailabilityCheck(candidates, cfg, {
         tlds,
         registries: registries as RegistryId[] | undefined,
+        includeApps,
+        includeSocial,
       });
-      return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
+      const payload = verbose ? results : results.map(toCompactAvailability);
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
     }
   );
 
   server.tool(
     "lint_seo",
-    "Stage 2 SERP collision check (up to 10 candidates) using the configured SERP provider (OpenSERP, SearXNG, Serper, Brave, Google CSE, Exa, or DuckDuckGo fallback).",
+    "Stage 2 SERP collision check (up to 10 candidates) with a built-in seoVerdict, near-domain detection, and automatic provider failover (OpenSERP, SearXNG, Serper, Brave, Google CSE, Exa, DuckDuckGo). Send finalists in ONE batch call.",
     LintSeoInputSchema.shape,
-    async ({ candidates, nicheKeywords, provider }) => {
+    async ({ candidates, nicheKeywords, provider, verbose }) => {
       const cfg = resolveConfig();
       const results = await runSeoCheck(candidates, cfg, {
         nicheKeywords,
         provider: provider as SerpProviderId | undefined,
       });
-      return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
+      const payload = verbose ? results : results.map(toCompactSeo);
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
     }
   );
 
   server.tool(
     "lint_names",
-    "Combined 2-stage funnel: screens all candidates in Stage 1, promotes top K cleanest names to Stage 2 SERP check, and returns collision scores and verdicts.",
+    "Combined 2-stage funnel: screens all candidates in Stage 1, promotes top K cleanest names to Stage 2 SERP check, and returns collision scores and verdicts. Compact results by default; pass verbose:true for raw payloads.",
     LintNamesInputSchema.shape,
-    async ({ candidates, nicheKeywords, topK, tlds, registries, provider }) => {
+    async ({
+      candidates,
+      nicheKeywords,
+      topK,
+      tlds,
+      registries,
+      includeApps,
+      includeSocial,
+      provider,
+      verbose,
+    }) => {
       const cfg = resolveConfig();
       const results = await runFullLint(candidates, cfg, {
         nicheKeywords,
         topK,
         tlds,
         registries: registries as RegistryId[] | undefined,
+        includeApps,
+        includeSocial,
         provider: provider as SerpProviderId | undefined,
       });
-      return { content: [{ type: "text", text: JSON.stringify(results, null, 2) }] };
+      const payload = verbose ? results : results.map(toCompactFullLint);
+      return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
     }
   );
 

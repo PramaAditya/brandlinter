@@ -35,6 +35,8 @@ Options:
   --registries <list>     Comma-separated registries: npm,pypi,crates (default: npm,pypi)
   --niche <keywords>      Niche keywords for SEO overlap check
   --provider <id>         SERP provider: auto|openserp|searxng|serper|brave|google-cse|exa|duckduckgo
+  --apps                  Also check the Apple App Store (exact + near/phonetic)
+  --social                Also check X, YouTube, Reddit, Bluesky, and LinkedIn handles
   --top-k <n>             Number of Stage 1 finalists to promote to Stage 2 (default: 5, must be >= 1)
   --format <type>         Output format: table | markdown | json (default: table)
   --json                  Shorthand for --format json
@@ -125,6 +127,8 @@ async function main(): Promise<void> {
         registries: { type: "string", default: "npm,pypi" },
         niche: { type: "string", default: "" },
         provider: { type: "string", default: "auto" },
+        apps: { type: "boolean", default: false },
+        social: { type: "boolean", default: false },
         "top-k": { type: "string", default: "5" },
         format: { type: "string", default: "table" },
         json: { type: "boolean", default: false },
@@ -166,6 +170,8 @@ async function main(): Promise<void> {
     const results = await runAvailabilityCheck(positionals, cfg, {
       tlds: values.tlds.split(","),
       registries: parseRegistries(values.registries),
+      includeApps: values.apps,
+      includeSocial: values.social,
     });
     console.log(fmt === "json" ? JSON.stringify(results, null, 2) : formatStage1Markdown(results));
     return;
@@ -190,6 +196,8 @@ async function main(): Promise<void> {
       nicheKeywords,
       provider,
       topK,
+      includeApps: values.apps,
+      includeSocial: values.social,
     });
     console.log(fmt === "json" ? JSON.stringify(results, null, 2) : formatFullLintMarkdown(results));
     return;

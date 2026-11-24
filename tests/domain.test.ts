@@ -100,16 +100,30 @@ describe("checkDomain", () => {
         return new Response("", { status: 404 });
       }
       return new Response(
-        JSON.stringify({ Status: 0, Answer: [{ data: "ns1.example.dev." }] }),
+        JSON.stringify({ Status: 0, Answer: [{ data: "ns1.example.xyz." }] }),
         { status: 200 }
       );
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const res = await checkDomain("takenapp", "dev", "https://dns.google/resolve");
+    const res = await checkDomain("takenapp", "xyz", "https://dns.google/resolve");
     expect(res.status).toBe("taken");
     expect(res.source).toBe("doh");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("queries Google Registry directly for .dev/.app and sends a User-Agent", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await checkDomain("nymlint", "dev", "https://dns.google/resolve");
+    expect(res.status).toBe("available");
+    expect(res.source).toBe("rdap");
+    // No rdap.org hop and no DoH corroboration: Google Registry is authoritative.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://pubapi.registry.google/rdap/domain/nymlint.dev");
+    expect((init.headers as Record<string, string>)["User-Agent"]).toContain("brandlinter");
   });
 
   it("trusts DIRECT_RDAP available without calling DoH", async () => {

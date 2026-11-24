@@ -22,7 +22,10 @@ export function createExaProvider(apiKey: string, timeoutMs = 15000): SerpProvid
               "x-api-key": apiKey,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ query, numResults: limit, type: "auto" }),
+            // Keyword mode, not neural: name-collision checks need pages that literally contain the
+            // candidate token, and Exa's "auto"/neural mode happily returns semantic neighbours
+            // (e.g. querying `"tabspan"` surfaced Stack Overflow answers about tab widths).
+            body: JSON.stringify({ query, numResults: limit, type: "keyword" }),
           });
           if (!res.ok) {
             return { provider: "exa", query, results: [], confidence: "medium", error: `HTTP ${res.status}` };

@@ -6,6 +6,15 @@ const DIRECT_RDAP: Record<string, string> = {
   com: "https://rdap.verisign.com/com/v1/domain/",
   net: "https://rdap.verisign.com/net/v1/domain/",
   org: "https://rdap.publicinterestregistry.org/rdap/domain/",
+  // Google Registry serves .dev/.app directly with authoritative 404s; routing them through
+  // rdap.org added a redirect and returned HTTP 403 in practice.
+  dev: "https://pubapi.registry.google/rdap/domain/",
+  app: "https://pubapi.registry.google/rdap/domain/",
+};
+
+const RDAP_HEADERS = {
+  Accept: "application/rdap+json, application/json",
+  "User-Agent": "brandlinter/0.2 (+https://github.com/PramaAditya/brandlinter)",
 };
 
 export async function checkDomainRdap(
@@ -23,7 +32,7 @@ export async function checkDomainRdap(
         fetch(`${base}${encodeURIComponent(domain)}`, {
           signal,
           redirect: "follow",
-          headers: { Accept: "application/rdap+json, application/json" },
+          headers: RDAP_HEADERS,
         }),
       timeoutMs
     );
