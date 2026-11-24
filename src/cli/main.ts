@@ -6,6 +6,7 @@ import {
   runSeoCheck,
   type RegistryId,
 } from "../core/pipeline.js";
+import { startMcpServer } from "../mcp/server.js";
 import {
   formatFullLintMarkdown,
   formatSeoMarkdown,
@@ -15,10 +16,8 @@ import {
 function printHelp(): void {
   console.log(`brandlinter - Pluggable name linter for SEO, domains, GitHub, and package registries
 
-Usage:
-  brandlinter check <names...> [options]   Stage 1 fast availability check
-  brandlinter seo <names...> [options]     Stage 2 SERP collision check
   brandlinter lint <names...> [options]    Full 2-stage funnel (Stage 1 -> Top K -> Stage 2)
+  brandlinter mcp                          Start stdio MCP server (Antigravity, OMP, Claude, Cursor)
   brandlinter doctor                       Inspect configuration & provider readiness
   brandlinter --help                       Show this help
 
@@ -53,6 +52,10 @@ async function main(): Promise<void> {
   }
   if (cmd === "doctor") {
     await runDoctor();
+    return;
+  }
+  if (cmd === "mcp") {
+    await startMcpServer();
     return;
   }
 
