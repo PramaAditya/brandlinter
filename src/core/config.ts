@@ -250,7 +250,7 @@ export async function runDoctorCheck(
     if (cfg.openserpUrl) {
       targets.push({
         label: `openserp (${cfg.openserpUrl})`,
-        url: cfg.openserpUrl,
+        url: `${cfg.openserpUrl}/mega/engines`,
         headers: cfg.openserpAuthHeader ? { Authorization: cfg.openserpAuthHeader } : undefined,
       });
     }
