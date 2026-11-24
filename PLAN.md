@@ -49,4 +49,4 @@ flowchart TB
 | **Phase 1** | Core Engine, Stage 1 Providers (DoH/RDAP, GitHub, npm/PyPI/crates) & CLI (`check`, `doctor`) | `done` | [20261124_121001_phase1_core_stage1_cli.md](.kanban/20261124_121001_phase1_core_stage1_cli.md) |
 | **Phase 2** | Pluggable SERP Providers (`openserp`, `searxng`, `serper`, `brave`, `exa`, `ddg`) & Scorer (`seo`, `lint`) | `done` | [20261124_121002_phase2_serp_providers_scorer.md](.kanban/20261124_121002_phase2_serp_providers_scorer.md) |
 | **Phase 3** | MCP Server (`stdio`), `SKILL.md`, & Opt-In Extensions (`porkbun`, `appstores`, `social`, `trademark`) | `done` | [20261124_121003_phase3_mcp_skill_extensions.md](.kanban/20261124_121003_phase3_mcp_skill_extensions.md) |
-| **Phase 4** | `README.md`, GitHub Actions CI & npm Provenance Release | `todo` | [20261124_121004_phase4_docs_oss_release.md](.kanban/20261124_121004_phase4_docs_oss_release.md) |
+| **Phase 4** | `README.md`, GitHub Actions CI & npm Provenance Release | `done` | [20261124_121004_phase4_docs_oss_release.md](.kanban/20261124_121004_phase4_docs_oss_release.md) |
