@@ -35,6 +35,48 @@ describe("Semaphore", () => {
     expect(results).toHaveLength(6);
     expect(maxActive).toBe(2);
   });
+
+  it("never exceeds maxConcurrency when a new caller arrives during waiter wake-up", async () => {
+    const sem = new Semaphore(1);
+    let active = 0;
+    let maxActive = 0;
+    const gate1 = Promise.withResolvers<void>();
+    const gate2 = Promise.withResolvers<void>();
+    const gate3 = Promise.withResolvers<void>();
+
+    const t1 = sem.run(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await gate1.promise;
+      active--;
+    });
+
+    const t2 = sem.run(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await gate2.promise;
+      active--;
+    });
+
+    await Promise.resolve();
+    gate1.resolve();
+    // New caller arrives synchronously right as t1 finishes and wakes t2
+    const t3 = sem.run(async () => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await gate3.promise;
+      active--;
+    });
+
+    await t1;
+    expect(maxActive).toBe(1);
+    gate2.resolve();
+    await t2;
+    expect(maxActive).toBe(1);
+    gate3.resolve();
+    await t3;
+    expect(maxActive).toBe(1);
+  });
 });
 
 describe("withTimeout", () => {

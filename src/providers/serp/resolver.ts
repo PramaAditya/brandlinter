@@ -38,6 +38,8 @@ export function resolveSerpProvider(
         return createExaProvider(cfg.exaApiKey);
       case "duckduckgo":
         return createDuckDuckGoProvider();
+      default:
+        throw new Error(`Unknown SERP provider: "${String(chosen)}"`);
     }
   }
 

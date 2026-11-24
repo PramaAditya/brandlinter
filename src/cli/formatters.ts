@@ -37,9 +37,13 @@ export function formatSeoMarkdown(results: SeoCheckResult[]): string {
     "| --- | --- | --- | --- | --- |",
   ];
   for (const r of results) {
-    const topDomains =
-      r.exactResults.slice(0, 3).map((x) => x.domain).join(", ") || (r.error ? `ERR: ${r.error}` : "None");
-    lines.push(`| ${r.name} | ${r.provider} | ${r.confidence} | ${r.exactResults.length} | ${topDomains} |`);
+    const domains = r.exactResults.slice(0, 3).map((x) => x.domain).join(", ");
+    const cell = r.error
+      ? domains
+        ? `${domains} (PARTIAL ERR: ${r.error})`
+        : `ERR: ${r.error}`
+      : domains || "None";
+    lines.push(`| ${r.name} | ${r.provider} | ${r.confidence} | ${r.exactResults.length} | ${cell} |`);
   }
   return lines.join("\n");
 }
@@ -52,10 +56,14 @@ export function formatFullLintMarkdown(results: FullLintResult[]): string {
   ];
   for (const r of results) {
     const com = r.domains.find((d) => d.tld === "com");
-    const serpCount = r.seo ? String(r.seo.exactResults.length) : "skipped";
-    const topComp = r.seo?.exactResults[0]?.domain ?? "-";
+    const serpCell = !r.seo
+      ? "skipped"
+      : r.seo.error
+        ? `ERR (${r.seo.exactResults.length})`
+        : String(r.seo.exactResults.length);
+    const topComp = r.seo?.exactResults[0]?.domain ?? (r.seo?.error ? `ERR: ${r.seo.error}` : "-");
     lines.push(
-      `| ${r.name} | ${r.scored.verdict} | ${r.scored.score}/100 | ${fmtStatus(r.github.orgAvailable)} | ${com ? fmtStatus(com.status) : "-"} | ${serpCount} | ${topComp} |`
+      `| ${r.name} | ${r.scored.verdict} | ${r.scored.score}/100 | ${fmtStatus(r.github.orgAvailable)} | ${com ? fmtStatus(com.status) : "-"} | ${serpCell} | ${topComp} |`
     );
   }
   return lines.join("\n");

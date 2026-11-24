@@ -63,4 +63,79 @@ describe("ecosystem providers", () => {
     expect(res.exactRepoCount).toBe(1);
     expect(res.topRepo?.stars).toBe(120);
   });
+
+  it("checkGitHub promotes orgAvailable to taken when an item owner matches slug", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("https://github.com/")) {
+        return new Response("", { status: 404 });
+      }
+      return new Response(
+        JSON.stringify({
+          total_count: 2,
+          items: [
+            {
+              full_name: "nymlint/cli",
+              stargazers_count: 15,
+              html_url: "https://github.com/nymlint/cli",
+            },
+          ],
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await checkGitHub("nymlint");
+    expect(res.orgAvailable).toBe("taken");
+    expect(res.exactRepoCount).toBe(2);
+  });
+
+  it("checkGitHub sets exactRepoCount to null when total_count is not a number", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("https://github.com/")) {
+        return new Response("", { status: 404 });
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await checkGitHub("nymlint");
+    expect(res.exactRepoCount).toBeNull();
+  });
+
+  it("checkGitHub prefers highest-starred exact owner or repoName match for topRepo", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("https://github.com/")) {
+        return new Response("", { status: 404 });
+      }
+      return new Response(
+        JSON.stringify({
+          total_count: 3,
+          items: [
+            {
+              full_name: "other/nymlint-pro",
+              stargazers_count: 500,
+              html_url: "https://github.com/other/nymlint-pro",
+            },
+            {
+              full_name: "bar/nymlint",
+              stargazers_count: 120,
+              html_url: "https://github.com/bar/nymlint",
+            },
+            {
+              full_name: "nymlint/sdk",
+              stargazers_count: 250,
+              html_url: "https://github.com/nymlint/sdk",
+            },
+          ],
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await checkGitHub("nymlint");
+    expect(res.topRepo?.fullName).toBe("nymlint/sdk");
+    expect(res.topRepo?.stars).toBe(250);
+  });
 });

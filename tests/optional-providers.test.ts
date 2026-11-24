@@ -38,6 +38,26 @@ describe("optional providers", () => {
     );
   });
 
+  it("checkAppStore does not false-positive on substring bundleId matches", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            resultCount: 2,
+            results: [
+              { trackName: "My AnyDisplay Pro", bundleId: "com.example.myanydisplayapp" },
+              { trackName: "Other", bundleId: "com.anydisplay.other" },
+            ],
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const res = await checkAppStore("anydisplay", "us");
+    expect(res.status).toBe("available");
+  });
+
   it("checkSocialHandles marks 404 available, 200 taken, 429 unknown", async () => {
     vi.stubGlobal(
       "fetch",
@@ -51,6 +71,36 @@ describe("optional providers", () => {
     expect(res.find((r) => r.platform === "X")?.status).toBe("available");
     expect(res.find((r) => r.platform === "Reddit")?.status).toBe("taken");
     expect(res.find((r) => r.platform === "Bluesky")?.status).toBe("unknown");
+  });
+
+  it("checkSocialHandles returns unknown on authwall redirect URLs", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("linkedin.com")) {
+          const res = new Response("", { status: 200 });
+          Object.defineProperty(res, "url", {
+            value: "https://www.linkedin.com/authwall?trk=guest_homepage",
+          });
+          return res;
+        }
+        if (url.includes("x.com")) {
+          const res = new Response("", { status: 200 });
+          Object.defineProperty(res, "url", {
+            value: "https://x.com/i/flow/login",
+          });
+          return res;
+        }
+        return new Response("", { status: 404 });
+      })
+    );
+    const res = await checkSocialHandles("nymlint");
+    const linkedin = res.find((r) => r.platform === "LinkedIn");
+    const x = res.find((r) => r.platform === "X");
+    expect(linkedin?.status).toBe("unknown");
+    expect(linkedin?.detail).toBe("Redirected to authwall");
+    expect(x?.status).toBe("unknown");
+    expect(x?.detail).toBe("Redirected to authwall");
   });
 
   it("buildTrademarkLinks returns heuristic search URLs with disclaimer", () => {

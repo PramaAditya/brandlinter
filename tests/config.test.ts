@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { resolveConfig, validateHttpUrl, redactConfig } from "../src/core/config.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import {
+  resolveConfig,
+  validateHttpUrl,
+  redactConfig,
+  runDoctorCheck,
+} from "../src/core/config.js";
 
 describe("validateHttpUrl", () => {
   it("accepts http and https URLs and strips trailing slashes", () => {
@@ -54,5 +59,42 @@ describe("redactConfig", () => {
     expect(JSON.stringify(safe)).not.toContain("ghp_secret");
     expect(safe.hasSerperKey).toBe(true);
     expect(safe.hasGithubToken).toBe(true);
+  });
+
+  it("throws on invalid serpProvider", () => {
+    expect(() =>
+      resolveConfig({
+        env: { BRANDLINTER_SERP_PROVIDER: "not-a-provider" },
+        cwd: "/nonexistent-dir-12345",
+      })
+    ).toThrow(/Invalid serpProvider/);
+  });
+
+  it("warns when google-cse is half-configured", () => {
+    const cfg = resolveConfig({
+      env: { GOOGLE_CSE_API_KEY: "only-key" },
+      cwd: "/nonexistent-dir-12345",
+    });
+    expect(cfg.warnings.some((w) => w.includes("google-cse"))).toBe(true);
+    expect(redactConfig(cfg).warnings).toEqual(cfg.warnings);
+  });
+});
+
+describe("runDoctorCheck", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns degraded status when probe fails", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
+    const cfg = resolveConfig({
+      env: { OPENSERP_URL: "http://localhost:7000" },
+      cwd: "/nonexistent-dir-12345",
+    });
+    const report = await runDoctorCheck(cfg);
+    expect(report.status).toBe("degraded");
+    expect(report.probes).toHaveLength(1);
+    expect(report.probes[0].ok).toBe(false);
+    expect(report.probes[0].detail).toContain("ECONNREFUSED");
   });
 });

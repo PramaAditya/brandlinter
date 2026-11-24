@@ -13,15 +13,19 @@ export class Semaphore {
       const { promise, resolve } = Promise.withResolvers<void>();
       this.queue.push(resolve);
       await promise;
+    } else {
+      this.active++;
     }
 
-    this.active++;
     try {
       return await fn();
     } finally {
-      this.active--;
       const next = this.queue.shift();
-      if (next) next();
+      if (next) {
+        next();
+      } else {
+        this.active--;
+      }
     }
   }
 }

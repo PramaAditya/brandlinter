@@ -4,7 +4,7 @@
 - **Scope:** `D:/Developer/brandlinter` (`src/**`, 23 TypeScript files across 4 non-overlapping slices)
 - **Coverage:** 4/4 slices audited in parallel (`core`, `domain+ecosystem`, `serp+optional`, `cli+mcp`); 0 slices skipped
 - **Findings:** 10 deduplicated root causes — P0: 3, P1: 5, P2: 2, P3: 0 (3 raw scout findings dropped as spec-correct or non-hazards)
-- **Status:** proposed (awaiting user decisions D1–D3)
+- **Status:** verified (all 10 findings fixed; 67/67 tests passing)
 
 ## Definition
 
@@ -14,11 +14,9 @@ An implicit state machine is any combination of flags, refs, caches, timers, que
 
 | ID | Question | Options | Chosen | Impact |
 | :--- | :--- | :--- | :--- | :--- |
-| D1 | How should `verdict` represent candidates whose SEO check was skipped (outside `topK`), errored, or whose Stage 1 probes returned `unknown`? | **A)** Add explicit `"UNVERIFIED"` verdict + rank verified-available above `unknown` when selecting `topK` *(recommended)* · **B)** Keep 3 verdicts (`CLEAN`/`CAUTION`/`CONFLICT`) and cap unverified/errored candidates at `CAUTION` (`<= 75`) | pending | Eliminates false `CLEAN 100` verdicts on outages and un-searched tail candidates |
-| D2 | Should `doctor` probe configured self-hosted endpoints (`OPENSERP_URL`, `SEARXNG_URL`)? | **A)** Report `resolvedSerpProvider` + config warnings + live reachability probe (default on in CLI `doctor`, opt-in/fast-timeout in MCP) *(recommended)* · **B)** Keep `doctor` 100% offline (only add `resolvedSerpProvider` + config warnings) | pending | Prevents `doctor` from reporting `"ok"` on broken config or dead self-hosted SERP |
-| D3 | Which GitHub repo matches should trigger the `-35` fatal popular-repo penalty? | **A)** Exact repo name match (`repo.name === slug`) OR org-owned repo (`owner === slug`) *(recommended)* · **B)** Org-owned repos only (`owner === slug`) | pending | Eliminates false `CONFLICT` from unrelated substring matches while catching `author/anydisplay` |
-
----
+| D1 | How should `verdict` represent candidates whose SEO check was skipped (outside `topK`), errored, or whose Stage 1 probes returned `unknown`? | **A)** Add explicit `"UNVERIFIED"` verdict + rank verified-available above `unknown` when selecting `topK` *(recommended)* · **B)** Keep 3 verdicts (`CLEAN`/`CAUTION`/`CONFLICT`) and cap unverified/errored candidates at `CAUTION` (`<= 75`) | **A** | Eliminates false `CLEAN 100` verdicts on outages and un-searched tail candidates |
+| D2 | Should `doctor` probe configured self-hosted endpoints (`OPENSERP_URL`, `SEARXNG_URL`)? | **A)** Report `resolvedSerpProvider` + config warnings + live reachability probe (default on in CLI `doctor`, opt-in/fast-timeout in MCP) *(recommended)* · **B)** Keep `doctor` 100% offline (only add `resolvedSerpProvider` + config warnings) | **A** | Prevents `doctor` from reporting `"ok"` on broken config or dead self-hosted SERP |
+| D3 | Which GitHub repo matches should trigger the `-35` fatal popular-repo penalty? | **A)** Exact repo name match (`repo.name === slug`) OR org-owned repo (`owner === slug`) *(recommended)* · **B)** Org-owned repos only (`owner === slug`) | **A** | Eliminates false `CONFLICT` from unrelated substring matches while catching `author/anydisplay` |
 
 ## Findings
 

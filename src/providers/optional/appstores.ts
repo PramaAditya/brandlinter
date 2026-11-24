@@ -15,40 +15,39 @@ export async function checkAppStore(
 ): Promise<AppStoreCheckResult> {
   const searchUrl = `https://apps.apple.com/search?term=${encodeURIComponent(name)}`;
   try {
-    const res = await withTimeout(
-      (signal) =>
-        fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(name)}&entity=software&limit=5&country=${encodeURIComponent(country)}`,
-          { signal }
-        ),
-      timeoutMs
-    );
-    if (!res.ok) {
-      return { store: "appstore", status: "unknown", url: searchUrl, detail: `HTTP ${res.status}` };
-    }
-    const data = (await res.json()) as {
-      resultCount?: number;
-      results?: Array<{ trackName?: string; bundleId?: string }>;
-    };
-    const lower = name.toLowerCase();
-    const exact = data.results?.find(
-      (r) =>
-        r.trackName?.toLowerCase() === lower || r.bundleId?.toLowerCase().includes(lower)
-    );
-    if (exact) {
+    return await withTimeout(async (signal) => {
+      const res = await fetch(
+        `https://itunes.apple.com/search?term=${encodeURIComponent(name)}&entity=software&limit=5&country=${encodeURIComponent(country)}`,
+        { signal }
+      );
+      if (!res.ok) {
+        return { store: "appstore", status: "unknown", url: searchUrl, detail: `HTTP ${res.status}` };
+      }
+      const data = (await res.json()) as {
+        resultCount?: number;
+        results?: Array<{ trackName?: string; bundleId?: string }>;
+      };
+      const lower = name.toLowerCase();
+      const exact = data.results?.find(
+        (r) =>
+          r.trackName?.toLowerCase() === lower ||
+          r.bundleId?.toLowerCase().split(".").pop() === lower
+      );
+      if (exact) {
+        return {
+          store: "appstore",
+          status: "taken",
+          url: searchUrl,
+          detail: `${exact.trackName ?? ""} (${exact.bundleId ?? ""})`,
+        };
+      }
       return {
         store: "appstore",
-        status: "taken",
+        status: "available",
         url: searchUrl,
-        detail: `${exact.trackName ?? ""} (${exact.bundleId ?? ""})`,
+        detail: `${data.resultCount ?? 0} partial matches`,
       };
-    }
-    return {
-      store: "appstore",
-      status: "available",
-      url: searchUrl,
-      detail: `${data.resultCount ?? 0} partial matches`,
-    };
+    }, timeoutMs);
   } catch (err: unknown) {
     return {
       store: "appstore",

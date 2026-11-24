@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { redactConfig, resolveConfig, type SerpProviderId } from "../core/config.js";
+import { resolveConfig, runDoctorCheck, type SerpProviderId } from "../core/config.js";
 import {
   runAvailabilityCheck,
   runFullLint,
@@ -84,16 +84,16 @@ export function createBrandlinterMcpServer(): McpServer {
 
   server.tool(
     "doctor",
-    "Inspect configured SERP/domain/GitHub providers (secrets redacted).",
-    {},
-    async () => {
+    "Inspect configured SERP/domain/GitHub providers, config warnings, and optionally probe self-hosted endpoints (secrets redacted).",
+    { probe: z.boolean().optional().describe("Probe configured self-hosted endpoints (default: true)") },
+    async ({ probe }) => {
       const cfg = resolveConfig();
+      const report = await runDoctorCheck(cfg, { probe: probe ?? true });
       return {
-        content: [{ type: "text", text: JSON.stringify({ status: "ok", config: redactConfig(cfg) }, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
       };
     }
   );
-
   return server;
 }
 

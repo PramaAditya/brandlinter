@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { checkDomainDoh } from "../src/providers/domain/doh.js";
-import { checkDomainRdap } from "../src/providers/domain/rdap.js";
+import { checkDomain, checkDomainRdap } from "../src/providers/domain/rdap.js";
 
 describe("checkDomainDoh", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it("returns available on NXDOMAIN (Status 3)", async () => {
     vi.stubGlobal(
@@ -37,6 +40,29 @@ describe("checkDomainDoh", () => {
     const res = await checkDomainDoh("nymlint", "dev", "https://dns.google/resolve");
     expect(res.status).toBe("unknown");
   });
+
+  it("aborts stalled res.json() inside withTimeout", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        const deferred = Promise.withResolvers<unknown>();
+        init?.signal?.addEventListener("abort", () => {
+          deferred.reject(new DOMException("The operation was aborted", "AbortError"));
+        });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => deferred.promise,
+        } as unknown as Response);
+      })
+    );
+    const promise = checkDomainDoh("nymlint", "dev", "https://dns.google/resolve", 50);
+    await vi.advanceTimersByTimeAsync(60);
+    const res = await promise;
+    expect(res.status).toBe("unknown");
+    expect(res.detail).toContain("aborted");
+  });
 });
 
 describe("checkDomainRdap", () => {
@@ -62,5 +88,52 @@ describe("checkDomainRdap", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 429 })));
     const res = await checkDomainRdap("nymlint", "dev");
     expect(res.status).toBe("unknown");
+  });
+});
+
+describe("checkDomain", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("corroborates non-DIRECT_RDAP available results with DoH and returns taken if DoH says taken", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith("https://rdap.org/")) {
+        return new Response("", { status: 404 });
+      }
+      return new Response(
+        JSON.stringify({ Status: 0, Answer: [{ data: "ns1.example.dev." }] }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await checkDomain("takenapp", "dev", "https://dns.google/resolve");
+    expect(res.status).toBe("taken");
+    expect(res.source).toBe("doh");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("trusts DIRECT_RDAP available without calling DoH", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await checkDomain("nymlint", "com", "https://dns.google/resolve");
+    expect(res.status).toBe("available");
+    expect(res.source).toBe("rdap");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("combines RDAP and DoH details when both return unknown", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("rdap")) {
+        return new Response("", { status: 429 });
+      }
+      return new Response(JSON.stringify({ Status: 2 }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await checkDomain("nymlint", "dev", "https://dns.google/resolve");
+    expect(res.status).toBe("unknown");
+    expect(res.detail).toContain("HTTP 429");
+    expect(res.detail).toContain("DNS Status 2");
   });
 });

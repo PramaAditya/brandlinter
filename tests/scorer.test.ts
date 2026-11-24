@@ -61,4 +61,73 @@ describe("scoreCandidate", () => {
     expect(res.score).toBe(40);
     expect(res.verdict).toBe("CONFLICT");
   });
+
+  it("marks candidate UNVERIFIED when SERP errors", () => {
+    const res = scoreCandidate({
+      name: "nymlint",
+      domains: [{ tld: "com", domain: "nymlint.com", url: "https://nymlint.com", status: "available", source: "rdap" }],
+      github: { orgAvailable: "available", orgUrl: "https://github.com/nymlint", exactRepoCount: 0 },
+      registries: [{ registry: "npm", packageName: "nymlint", url: "https://npmjs.com/package/nymlint", status: "available" }],
+      serpResults: [],
+      serpError: "SERP timeout",
+    });
+    expect(res.score).toBe(100);
+    expect(res.verdict).toBe("UNVERIFIED");
+  });
+
+  it("marks candidate UNVERIFIED when SERP is skipped (serpChecked: false)", () => {
+    const res = scoreCandidate({
+      name: "nymlint",
+      domains: [{ tld: "com", domain: "nymlint.com", url: "https://nymlint.com", status: "available", source: "rdap" }],
+      github: { orgAvailable: "available", orgUrl: "https://github.com/nymlint", exactRepoCount: 0 },
+      registries: [{ registry: "npm", packageName: "nymlint", url: "https://npmjs.com/package/nymlint", status: "available" }],
+      serpChecked: false,
+    });
+    expect(res.verdict).toBe("UNVERIFIED");
+  });
+
+  it("marks candidate UNVERIFIED when domain or registry status is unknown", () => {
+    const res = scoreCandidate({
+      name: "nymlint",
+      domains: [{ tld: "com", domain: "nymlint.com", url: "https://nymlint.com", status: "unknown", source: "rdap" }],
+      github: { orgAvailable: "available", orgUrl: "https://github.com/nymlint", exactRepoCount: 0 },
+      registries: [{ registry: "npm", packageName: "nymlint", url: "https://npmjs.com/package/nymlint", status: "unknown" }],
+      serpResults: [],
+    });
+    expect(res.verdict).toBe("UNVERIFIED");
+  });
+
+  it("does not apply fatal penalty for unrelated substring GitHub repo", () => {
+    const res = scoreCandidate({
+      name: "slug",
+      domains: [],
+      github: {
+        orgAvailable: "available",
+        orgUrl: "https://github.com/slug",
+        exactRepoCount: 1,
+        topRepo: { fullName: "other/awesome-slug-helper", stars: 500, url: "https://github.com/other/awesome-slug-helper" },
+      },
+      registries: [],
+      serpResults: [],
+    });
+    expect(res.score).toBe(100);
+    expect(res.verdict).toBe("CLEAN");
+  });
+
+  it("applies fatal CONFLICT for exact author/slug GitHub repo with >= 100 stars", () => {
+    const res = scoreCandidate({
+      name: "slug",
+      domains: [],
+      github: {
+        orgAvailable: "available",
+        orgUrl: "https://github.com/slug",
+        exactRepoCount: 1,
+        topRepo: { fullName: "author/slug", stars: 150, url: "https://github.com/author/slug" },
+      },
+      registries: [],
+      serpResults: [],
+    });
+    expect(res.score).toBe(65);
+    expect(res.verdict).toBe("CONFLICT");
+  });
 });

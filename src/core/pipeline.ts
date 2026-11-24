@@ -31,6 +31,8 @@ export interface SeoCheckResult {
   confidence: "high" | "medium" | "low";
   exactResults: SerpItem[];
   nicheResults: SerpItem[];
+  exactError?: string;
+  nicheError?: string;
   error?: string;
 }
 
@@ -70,12 +72,16 @@ export async function runAvailabilityCheck(
           registries: regResults,
           serpResults: [],
         });
+        const unknownCount =
+          domains.filter((d) => d.status === "unknown").length +
+          regResults.filter((r) => r.status === "unknown").length +
+          (github.orgAvailable === "unknown" ? 1 : 0);
         return {
           name,
           domains,
           github,
           registries: regResults,
-          preliminaryScore: prelim.score,
+          preliminaryScore: Math.max(0, prelim.score - unknownCount * 5),
         };
       })
     )
@@ -107,6 +113,8 @@ export async function runSeoCheck(
           confidence: exact.confidence,
           exactResults: exact.results,
           nicheResults: nicheRes.results,
+          exactError: exact.error,
+          nicheError: nicheRes.error,
           error: exact.error ?? nicheRes.error,
         };
       })
@@ -125,12 +133,16 @@ export async function runFullLint(
     topK?: number;
   }
 ): Promise<FullLintResult[]> {
+  const topK = options?.topK ?? 5;
+  if (!Number.isInteger(topK) || topK < 1) {
+    throw new Error(`Invalid topK "${topK}": must be an integer >= 1`);
+  }
+
   const stage1 = await runAvailabilityCheck(rawCandidates, cfg, {
     tlds: options?.tlds,
     registries: options?.registries,
   });
 
-  const topK = options?.topK ?? 5;
   const shortlisted = [...stage1]
     .sort((a, b) => b.preliminaryScore - a.preliminaryScore)
     .slice(0, topK)
@@ -144,13 +156,15 @@ export async function runFullLint(
 
   return stage1.map((item) => {
     const seo = seoMap.get(item.name);
-    const combinedSerp = [...(seo?.exactResults ?? []), ...(seo?.nicheResults ?? [])];
     const scored = scoreCandidate({
       name: item.name,
       domains: item.domains,
       github: item.github,
       registries: item.registries,
-      serpResults: combinedSerp,
+      serpResults: seo?.exactResults ?? [],
+      nicheResults: seo?.nicheResults ?? [],
+      serpChecked: Boolean(seo),
+      serpError: seo?.error,
     });
     return { ...item, seo, scored };
   });

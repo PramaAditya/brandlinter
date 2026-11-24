@@ -23,21 +23,23 @@ export function createOpenSerpProvider(
       if (authHeader) headers.Authorization = authHeader;
 
       try {
-        const res = await withTimeout((signal) => fetch(url, { signal, headers }), timeoutMs);
-        if (!res.ok) {
-          return { provider: "openserp", query, results: [], confidence: "high", error: `HTTP ${res.status}` };
-        }
-        const data = (await res.json()) as {
-          results?: Array<{ rank?: number; title?: string; url?: string; domain?: string; snippet?: string }>;
-        };
-        const results: SerpItem[] = (data.results ?? []).slice(0, limit).map((r, idx) => ({
-          rank: r.rank ?? idx + 1,
-          title: r.title ?? "",
-          url: r.url ?? "",
-          domain: r.domain || domainFromUrl(r.url ?? ""),
-          snippet: r.snippet ?? "",
-        }));
-        return { provider: "openserp", query, results, confidence: "high" };
+        return await withTimeout(async (signal) => {
+          const res = await fetch(url, { signal, headers });
+          if (!res.ok) {
+            return { provider: "openserp", query, results: [], confidence: "high", error: `HTTP ${res.status}` };
+          }
+          const data = (await res.json()) as {
+            results?: Array<{ rank?: number; title?: string; url?: string; domain?: string; snippet?: string }>;
+          };
+          const results: SerpItem[] = (data.results ?? []).slice(0, limit).map((r, idx) => ({
+            rank: r.rank ?? idx + 1,
+            title: r.title ?? "",
+            url: r.url ?? "",
+            domain: r.domain || domainFromUrl(r.url ?? ""),
+            snippet: r.snippet ?? "",
+          }));
+          return { provider: "openserp", query, results, confidence: "high" };
+        }, timeoutMs);
       } catch (err: unknown) {
         return {
           provider: "openserp",

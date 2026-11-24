@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { resolveConfig, redactConfig, type SerpProviderId } from "../core/config.js";
+import { resolveConfig, runDoctorCheck, type SerpProviderId } from "../core/config.js";
 import {
   runAvailabilityCheck,
   runFullLint,
@@ -13,12 +13,19 @@ import {
   formatStage1Markdown,
 } from "./formatters.js";
 
+const VALID_COMMANDS: Record<string, true> = { check: true, seo: true, lint: true, doctor: true, mcp: true };
+const VALID_FORMATS: Record<string, true> = { table: true, markdown: true, json: true };
+const VALID_REGISTRIES: Record<RegistryId, true> = { npm: true, pypi: true, crates: true };
+
 function printHelp(): void {
   console.log(`brandlinter - Pluggable name linter for SEO, domains, GitHub, and package registries
 
+Usage:
+  brandlinter check <names...> [options]   Stage 1 fast availability check
+  brandlinter seo <names...> [options]     Stage 2 SERP collision check
   brandlinter lint <names...> [options]    Full 2-stage funnel (Stage 1 -> Top K -> Stage 2)
   brandlinter mcp                          Start stdio MCP server (Antigravity, OMP, Claude, Cursor)
-  brandlinter doctor                       Inspect configuration & provider readiness
+  brandlinter doctor [--no-probe]          Inspect configuration & probe self-hosted endpoints
   brandlinter --help                       Show this help
 
 Options:
@@ -26,22 +33,42 @@ Options:
   --registries <list>     Comma-separated registries: npm,pypi,crates (default: npm,pypi)
   --niche <keywords>      Niche keywords for SEO overlap check
   --provider <id>         SERP provider: auto|openserp|searxng|serper|brave|google-cse|exa|duckduckgo
-  --top-k <n>             Number of Stage 1 finalists to promote to Stage 2 (default: 5)
+  --top-k <n>             Number of Stage 1 finalists to promote to Stage 2 (default: 5, must be >= 1)
   --format <type>         Output format: table | markdown | json (default: table)
   --json                  Shorthand for --format json
 `);
 }
 
 function parseRegistries(raw: string): RegistryId[] {
-  return raw
+  const parts = raw
     .split(",")
     .map((r) => r.trim().toLowerCase())
-    .filter((r): r is RegistryId => r === "npm" || r === "pypi" || r === "crates");
+    .filter(Boolean);
+  for (const p of parts) {
+    if (!(p in VALID_REGISTRIES)) {
+      throw new Error(`Invalid registry "${p}". Valid values: npm, pypi, crates`);
+    }
+  }
+  return parts as RegistryId[];
 }
 
-async function runDoctor(): Promise<void> {
+async function runDoctor(args: string[]): Promise<void> {
+  const { values } = parseArgs({
+    args,
+    allowPositionals: false,
+    options: {
+      probe: { type: "boolean", default: true },
+      "no-probe": { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  if (values.help) {
+    printHelp();
+    return;
+  }
   const cfg = resolveConfig();
-  console.log(JSON.stringify({ status: "ok", config: redactConfig(cfg) }, null, 2));
+  const report = await runDoctorCheck(cfg, { probe: values["no-probe"] ? false : values.probe });
+  console.log(JSON.stringify(report, null, 2));
 }
 
 async function main(): Promise<void> {
@@ -50,28 +77,52 @@ async function main(): Promise<void> {
     printHelp();
     return;
   }
+  if (!(cmd in VALID_COMMANDS)) {
+    console.error(`Unknown command: ${cmd}`);
+    printHelp();
+    process.exitCode = 2;
+    return;
+  }
   if (cmd === "doctor") {
-    await runDoctor();
+    await runDoctor(rest);
     return;
   }
   if (cmd === "mcp") {
+    if (rest.includes("--help") || rest.includes("-h")) {
+      printHelp();
+      return;
+    }
     await startMcpServer();
     return;
   }
 
-  const { values, positionals } = parseArgs({
-    args: rest,
-    allowPositionals: true,
-    options: {
-      tlds: { type: "string", default: "com,dev,io,org" },
-      registries: { type: "string", default: "npm,pypi" },
-      niche: { type: "string", default: "" },
-      provider: { type: "string", default: "auto" },
-      "top-k": { type: "string", default: "5" },
-      format: { type: "string", default: "table" },
-      json: { type: "boolean", default: false },
-    },
-  });
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: rest,
+      allowPositionals: true,
+      options: {
+        tlds: { type: "string", default: "com,dev,io,org" },
+        registries: { type: "string", default: "npm,pypi" },
+        niche: { type: "string", default: "" },
+        provider: { type: "string", default: "auto" },
+        "top-k": { type: "string", default: "5" },
+        format: { type: "string", default: "table" },
+        json: { type: "boolean", default: false },
+        help: { type: "boolean", short: "h", default: false },
+      },
+    });
+  } catch (err: unknown) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 2;
+    return;
+  }
+
+  const { values, positionals } = parsed;
+  if (values.help) {
+    printHelp();
+    return;
+  }
 
   if (positionals.length === 0) {
     console.error("Error: provide at least one candidate name.");
@@ -79,9 +130,17 @@ async function main(): Promise<void> {
     return;
   }
 
-  const cfg = resolveConfig();
-  const fmt = values.json ? "json" : values.format;
+  const fmt = values.json ? "json" : values.format.toLowerCase();
+  if (!(fmt in VALID_FORMATS)) {
+    console.error(`Invalid --format "${values.format}". Valid values: table, markdown, json`);
+    process.exitCode = 2;
+    return;
+  }
+
   const provider = values.provider as SerpProviderId;
+  const cfg = resolveConfig({
+    overrides: provider !== "auto" ? { serpProvider: provider } : undefined,
+  });
   const nicheKeywords = values.niche ? values.niche.split(/\s+/).filter(Boolean) : undefined;
 
   if (cmd === "check") {
@@ -100,7 +159,12 @@ async function main(): Promise<void> {
   }
 
   if (cmd === "lint") {
-    const topK = Number.parseInt(values["top-k"], 10) || 5;
+    const topK = Number(values["top-k"]);
+    if (!Number.isInteger(topK) || topK < 1) {
+      console.error(`Invalid --top-k "${values["top-k"]}". Must be an integer >= 1.`);
+      process.exitCode = 2;
+      return;
+    }
     const results = await runFullLint(positionals, cfg, {
       tlds: values.tlds.split(","),
       registries: parseRegistries(values.registries),
@@ -111,10 +175,6 @@ async function main(): Promise<void> {
     console.log(fmt === "json" ? JSON.stringify(results, null, 2) : formatFullLintMarkdown(results));
     return;
   }
-
-  console.error(`Unknown command: ${cmd}`);
-  printHelp();
-  process.exitCode = 2;
 }
 
 main().catch((err: unknown) => {

@@ -40,42 +40,57 @@ export async function checkGitHub(
   }
 
   try {
-    const searchRes = await withTimeout(
-      (signal) =>
-        fetch(
-          `https://api.github.com/search/repositories?q=${encodeURIComponent(slug)}+in:name&sort=stars&per_page=3`,
-          { signal, headers }
-        ),
-      timeoutMs
-    );
+    return await withTimeout(async (signal) => {
+      const searchRes = await fetch(
+        `https://api.github.com/search/repositories?q=${encodeURIComponent(slug)}+in:name&sort=stars&per_page=3`,
+        { signal, headers }
+      );
 
-    if (!searchRes.ok) {
+      if (!searchRes.ok) {
+        return {
+          orgAvailable,
+          orgUrl,
+          exactRepoCount: null,
+          detail: [orgDetail, `Repo search HTTP ${searchRes.status}`].filter(Boolean).join("; "),
+        };
+      }
+
+      const data = (await searchRes.json()) as {
+        total_count?: number;
+        items?: Array<{ full_name: string; stargazers_count: number; html_url: string }>;
+      };
+      const items = data.items ?? [];
+      const lowerSlug = slug.toLowerCase();
+      if (items.some((item) => item.full_name.split("/")[0]?.toLowerCase() === lowerSlug)) {
+        orgAvailable = "taken";
+      }
+      const exactRepoCount = typeof data.total_count === "number" ? data.total_count : null;
+      const matchingItems = items.filter((item) => {
+        const [rawOwner = "", rawRepo = ""] = item.full_name.split("/");
+        const owner = rawOwner.toLowerCase();
+        const repoName = rawRepo.toLowerCase();
+        return owner === lowerSlug || repoName === lowerSlug;
+      });
+      const top =
+        matchingItems.length > 0
+          ? matchingItems.reduce((best, curr) =>
+              curr.stargazers_count > best.stargazers_count ? curr : best
+            )
+          : items[0];
       return {
         orgAvailable,
         orgUrl,
-        exactRepoCount: null,
-        detail: [orgDetail, `Repo search HTTP ${searchRes.status}`].filter(Boolean).join("; "),
+        exactRepoCount,
+        topRepo: top
+          ? {
+              fullName: top.full_name,
+              stars: top.stargazers_count,
+              url: top.html_url,
+            }
+          : undefined,
+        detail: orgDetail,
       };
-    }
-
-    const data = (await searchRes.json()) as {
-      total_count?: number;
-      items?: Array<{ full_name: string; stargazers_count: number; html_url: string }>;
-    };
-    const top = data.items?.[0];
-    return {
-      orgAvailable,
-      orgUrl,
-      exactRepoCount: data.total_count ?? 0,
-      topRepo: top
-        ? {
-            fullName: top.full_name,
-            stars: top.stargazers_count,
-            url: top.html_url,
-          }
-        : undefined,
-      detail: orgDetail,
-    };
+    }, timeoutMs);
   } catch (err: unknown) {
     return {
       orgAvailable,

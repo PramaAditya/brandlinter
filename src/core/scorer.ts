@@ -5,7 +5,7 @@ import type {
   SerpItem,
 } from "../providers/types.js";
 
-export type Verdict = "CLEAN" | "CAUTION" | "CONFLICT";
+export type Verdict = "CLEAN" | "CAUTION" | "CONFLICT" | "UNVERIFIED";
 
 export interface ScoreBreakdownItem {
   reason: string;
@@ -35,13 +35,18 @@ export function scoreCandidate(input: {
   domains: DomainCheckResult[];
   github: GitHubCheckResult;
   registries: RegistryCheckResult[];
-  serpResults: SerpItem[];
+  serpResults?: SerpItem[];
+  nicheResults?: SerpItem[];
+  serpChecked?: boolean;
+  serpError?: string;
 }): ScoredCandidate {
   const slug = input.name.toLowerCase();
   const penalties: ScoreBreakdownItem[] = [];
   let fatal = false;
+  const serpResults = input.serpResults ?? [];
+  const nicheResults = input.nicheResults ?? [];
 
-  const exactDomainInSerp = input.serpResults.slice(0, 10).some((item) => {
+  const exactDomainInSerp = serpResults.slice(0, 10).some((item) => {
     const host = item.domain.toLowerCase().replace(/^www\./, "");
     const sld = host.split(".")[0];
     return sld === slug;
@@ -52,7 +57,18 @@ export function scoreCandidate(input: {
     fatal = true;
   }
 
-  const dictionaryTrap = input.serpResults.slice(0, 3).some((item) => {
+  const nicheCompetitorOverlap = nicheResults.slice(0, 10).some((item) => {
+    const host = item.domain.toLowerCase().replace(/^www\./, "");
+    const sld = host.split(".")[0];
+    return sld === slug;
+  });
+
+  if (nicheCompetitorOverlap) {
+    penalties.push({ reason: "Niche competitor overlap", penalty: 30 });
+    fatal = true;
+  }
+
+  const dictionaryTrap = serpResults.slice(0, 3).some((item) => {
     const host = item.domain.toLowerCase();
     return DICTIONARY_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
   });
@@ -61,7 +77,10 @@ export function scoreCandidate(input: {
     penalties.push({ reason: "Dictionary/encyclopedia trap in SERP Top 3", penalty: 30 });
   }
 
-  const stars = input.github.topRepo?.stars ?? 0;
+  const topRepoFullName = input.github.topRepo?.fullName.toLowerCase();
+  const [repoOwner, repoName] = topRepoFullName ? topRepoFullName.split("/") : ["", ""];
+  const isExactGithubRepo = repoOwner === slug || repoName === slug;
+  const stars = isExactGithubRepo ? (input.github.topRepo?.stars ?? 0) : 0;
   if (stars >= 100) {
     penalties.push({ reason: `Popular GitHub repo (${stars} stars)`, penalty: 35 });
     fatal = true;
@@ -89,9 +108,17 @@ export function scoreCandidate(input: {
   const totalPenalty = penalties.reduce((acc, p) => acc + p.penalty, 0);
   const score = Math.max(0, 100 - totalPenalty);
 
+  const hasUnknown =
+    input.github.orgAvailable === "unknown" ||
+    input.registries.some((r) => r.status === "unknown") ||
+    input.domains.some((d) => d.status === "unknown");
+  const serpUnchecked = input.serpChecked === false || Boolean(input.serpError);
+
   let verdict: Verdict = "CLEAN";
   if (fatal || score < 50) {
     verdict = "CONFLICT";
+  } else if (serpUnchecked || hasUnknown) {
+    verdict = "UNVERIFIED";
   } else if (score < 80) {
     verdict = "CAUTION";
   }

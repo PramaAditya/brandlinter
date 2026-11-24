@@ -60,7 +60,17 @@ export async function checkDomain(
   dohUrl = "https://dns.google/resolve"
 ): Promise<DomainCheckResult> {
   const rdapRes = await checkDomainRdap(slug, tld);
-  if (rdapRes.status !== "unknown") {
+  if (rdapRes.status === "taken") {
+    return rdapRes;
+  }
+  if (rdapRes.status === "available") {
+    if (Object.hasOwn(DIRECT_RDAP, tld)) {
+      return rdapRes;
+    }
+    const dohRes = await checkDomainDoh(slug, tld, dohUrl);
+    if (dohRes.status === "taken") {
+      return dohRes;
+    }
     return rdapRes;
   }
   const dohRes = await checkDomainDoh(slug, tld, dohUrl);
@@ -70,5 +80,12 @@ export async function checkDomain(
       detail: `RDAP fallback (${rdapRes.detail ?? "unavailable"})`,
     };
   }
-  return rdapRes;
+  const combinedDetail =
+    [rdapRes.detail ? `RDAP: ${rdapRes.detail}` : null, dohRes.detail ? `DoH: ${dohRes.detail}` : null]
+      .filter(Boolean)
+      .join("; ") || undefined;
+  return {
+    ...rdapRes,
+    detail: combinedDetail,
+  };
 }

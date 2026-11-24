@@ -20,21 +20,23 @@ export function createGoogleCseProvider(
       const num = Math.min(limit, 10);
       const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(apiKey)}&cx=${encodeURIComponent(cx)}&q=${encodeURIComponent(query)}&num=${num}`;
       try {
-        const res = await withTimeout((signal) => fetch(url, { signal }), timeoutMs);
-        if (!res.ok) {
-          return { provider: "google-cse", query, results: [], confidence: "high", error: `HTTP ${res.status}` };
-        }
-        const data = (await res.json()) as {
-          items?: Array<{ title?: string; link?: string; snippet?: string }>;
-        };
-        const results: SerpItem[] = (data.items ?? []).slice(0, limit).map((r, idx) => ({
-          rank: idx + 1,
-          title: r.title ?? "",
-          url: r.link ?? "",
-          domain: domainFromUrl(r.link ?? ""),
-          snippet: r.snippet ?? "",
-        }));
-        return { provider: "google-cse", query, results, confidence: "high" };
+        return await withTimeout(async (signal) => {
+          const res = await fetch(url, { signal });
+          if (!res.ok) {
+            return { provider: "google-cse", query, results: [], confidence: "high", error: `HTTP ${res.status}` };
+          }
+          const data = (await res.json()) as {
+            items?: Array<{ title?: string; link?: string; snippet?: string }>;
+          };
+          const results: SerpItem[] = (data.items ?? []).slice(0, limit).map((r, idx) => ({
+            rank: idx + 1,
+            title: r.title ?? "",
+            url: r.link ?? "",
+            domain: domainFromUrl(r.link ?? ""),
+            snippet: r.snippet ?? "",
+          }));
+          return { provider: "google-cse", query, results, confidence: "high" };
+        }, timeoutMs);
       } catch (err: unknown) {
         return {
           provider: "google-cse",

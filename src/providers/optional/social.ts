@@ -34,6 +34,16 @@ export async function checkSocialHandles(
             }),
           timeoutMs
         );
+        if (res.url) {
+          try {
+            const finalPath = new URL(res.url).pathname;
+            if (/\/(login|signin|authwall|checkpoint|challenge)/i.test(finalPath)) {
+              return { platform, url, status: "unknown", detail: "Redirected to authwall" };
+            }
+          } catch {
+            // ignore malformed res.url
+          }
+        }
         if (res.status === 404 || res.status === 410) {
           return { platform, url, status: "available" };
         }
