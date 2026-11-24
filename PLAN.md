@@ -50,3 +50,4 @@ flowchart TB
 | **Phase 2** | Pluggable SERP Providers (`openserp`, `searxng`, `serper`, `brave`, `exa`, `ddg`) & Scorer (`seo`, `lint`) | `done` | [20261124_121002_phase2_serp_providers_scorer.md](.kanban/20261124_121002_phase2_serp_providers_scorer.md) |
 | **Phase 3** | MCP Server (`stdio`), `SKILL.md`, & Opt-In Extensions (`porkbun`, `appstores`, `social`, `trademark`) | `done` | [20261124_121003_phase3_mcp_skill_extensions.md](.kanban/20261124_121003_phase3_mcp_skill_extensions.md) |
 | **Phase 4** | `README.md`, GitHub Actions CI & npm Provenance Release | `done` | [20261124_121004_phase4_docs_oss_release.md](.kanban/20261124_121004_phase4_docs_oss_release.md) |
+| **Phase 5** | v0.2.0: Real-World Ergonomics (`SKILL.md` gate, SERP failover, compact MCP, Exa keyword, App Store & near-miss) | `todo` | [20261124_135001_phase5_v0_2_real_world_ergonomics.md](.kanban/20261124_135001_phase5_v0_2_real_world_ergonomics.md) |
