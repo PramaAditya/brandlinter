@@ -12,8 +12,9 @@ import {
   formatSeoMarkdown,
   formatStage1Markdown,
 } from "./formatters.js";
+import { installSkill, type SkillTarget } from "./skill.js";
 
-const VALID_COMMANDS: Record<string, true> = { check: true, seo: true, lint: true, doctor: true, mcp: true };
+const VALID_COMMANDS: Record<string, true> = { check: true, seo: true, lint: true, doctor: true, mcp: true, "install-skill": true };
 const VALID_FORMATS: Record<string, true> = { table: true, markdown: true, json: true };
 const VALID_REGISTRIES: Record<RegistryId, true> = { npm: true, pypi: true, crates: true };
 
@@ -25,6 +26,7 @@ Usage:
   brandlinter seo <names...> [options]     Stage 2 SERP collision check
   brandlinter lint <names...> [options]    Full 2-stage funnel (Stage 1 -> Top K -> Stage 2)
   brandlinter mcp                          Start stdio MCP server (Antigravity, OMP, Claude, Cursor)
+  brandlinter install-skill [--target id]  Install bundled SKILL.md (agents|claude|omp|cursor)
   brandlinter doctor [--no-probe]          Inspect configuration & probe self-hosted endpoints
   brandlinter --help                       Show this help
 
@@ -93,6 +95,23 @@ async function main(): Promise<void> {
       return;
     }
     await startMcpServer();
+    return;
+  }
+  if (cmd === "install-skill") {
+    const { values } = parseArgs({
+      args: rest,
+      allowPositionals: false,
+      options: {
+        target: { type: "string", default: "agents" },
+        help: { type: "boolean", short: "h", default: false },
+      },
+    });
+    if (values.help) {
+      printHelp();
+      return;
+    }
+    const dest = installSkill({ target: values.target as SkillTarget });
+    console.log(`Installed brandlinter skill to ${dest}`);
     return;
   }
 
