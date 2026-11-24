@@ -9,7 +9,7 @@ Use this skill whenever the user asks to name, rename, or rebrand a software pro
 
 ## 1. Naming Constraints (Before Calling Tools)
 
-- **Avoid generic 2-word English compounds** (`AnyDisplay`, `OpenView`, `FastSync`) — they almost always collide with existing `.app`/`.com` SaaS products on Google page 1.
+- **Avoid generic 2-word English compounds** (`FastSync`, `OpenView`, `CloudFlow`) — they almost always collide with existing `.app`/`.com` SaaS products on Google page 1.
 - **Avoid dictionary traps** — single common English words whose Top 3 Google results are Wikipedia/Merriam-Webster.
 - **Prefer:** 2-syllable coined neologisms, Greek/Latin roots + technical suffixes (`nym`, `nom`, `lint`, `sift`, `scout`), or crisp portmanteaus that are easy to spell and type in a terminal.
 
