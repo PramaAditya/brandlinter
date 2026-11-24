@@ -12,7 +12,7 @@
     }
   },
   "bin": {
-    "brandlinter": "./dist/cli.js"
+    "brandlinter": "dist/cli.js"
   },
   "files": [
     "dist",
