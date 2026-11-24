@@ -1,6 +1,6 @@
 ---
 title: "Phase 5 (v0.2.0): Real-World Ergonomics, SERP Failover & App Store Wiring (TDD)"
-status: todo
+status: done
 priority: high
 created_at: 2026-11-24T13:50:01+07:00
 tags:
@@ -26,11 +26,11 @@ tags:
 
 ## Checklist
 
-- [ ] **Skill Gate (`skills/brandlinter/SKILL.md`):** Separate Phase A (brainstorming, no MCP calls) vs Phase B (linting on explicit check request) and forbid parallel `lint_seo` fan-out on self-hosted OpenSERP.
-- [ ] **Red -> Green (SERP Failover):** Write mocked 502/timeout failover tests and implement multi-provider failover chain (`fallbackFrom` metadata) in `resolver.ts` + `pipeline.ts`.
-- [ ] **Red -> Green (Exa Keyword & RDAP Speed):** Switch Exa exact queries to `type: "keyword"` and optimize `.dev`/`.app` RDAP handling (avoid repeated 403 fallback latency) with unit tests.
-- [ ] **Red -> Green (Compact MCP + SEO Verdict):** Return `seoVerdict` + compact Top 5 summary from `lint_seo` / `lint_availability` / `lint_names` (`verbose?: boolean` opt-in) with schema & payload-size tests.
-- [ ] **Red -> Green (Near-Miss & App Stores Wiring):** Wire `includeApps` / `includeSocial` into CLI & MCP, and add prefix-domain + Levenshtein `<= 1` phonetic near-miss warnings in `scorer.ts`.
+- [x] **Skill Gate (`skills/brandlinter/SKILL.md`):** Separate Phase A (brainstorming, no MCP calls) vs Phase B (linting on explicit check request) and forbid parallel `lint_seo` fan-out on self-hosted OpenSERP.
+- [x] **Red -> Green (SERP Failover):** Write mocked 502/timeout failover tests and implement multi-provider failover chain (`fallbackFrom` metadata) in `resolver.ts` + `pipeline.ts`.
+- [x] **Red -> Green (Exa Keyword & RDAP Speed):** Switch Exa exact queries to `type: "keyword"` and optimize `.dev`/`.app` RDAP handling (avoid repeated 403 fallback latency) with unit tests.
+- [x] **Red -> Green (Compact MCP + SEO Verdict):** Return `seoVerdict` + compact Top 5 summary from `lint_seo` / `lint_availability` / `lint_names` (`verbose?: boolean` opt-in) with schema & payload-size tests.
+- [x] **Red -> Green (Near-Miss & App Stores Wiring):** Wire `includeApps` / `includeSocial` into CLI & MCP, and add prefix-domain + Levenshtein `<= 1` phonetic near-miss warnings in `scorer.ts`.
 
 ## Verification (2026-11-24)
 
