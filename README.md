@@ -36,7 +36,15 @@ Add to your MCP config:
 
 *(Omit `env` to run in zero-key mode, or swap `OPENSERP_URL` for `SEARXNG_URL`, `SERPER_API_KEY`, `BRAVE_API_KEY`, or `EXA_API_KEY`.)*
 
-Pair with [`skills/brandlinter/SKILL.md`](skills/brandlinter/SKILL.md) so your agent knows how to brainstorm and run the 2-stage funnel.
+Pair with [`skills/brandlinter/SKILL.md`](skills/brandlinter/SKILL.md) so your agent knows how to brainstorm and run the 2-stage funnel:
+
+```bash
+# Via Vercel / skills.sh ecosystem
+npx skills add PramaAditya/brandlinter
+
+# Or directly from the npm package (targets: agents | claude | omp | cursor)
+npx brandlinter install-skill --target agents
+```
 
 ### 2. CLI
 
