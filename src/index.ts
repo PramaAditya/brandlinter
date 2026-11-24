@@ -1,6 +1,8 @@
 export * from "./core/config.js";
 export * from "./core/sanitize.js";
 export * from "./core/concurrency.js";
+export * from "./core/scorer.js";
+export * from "./core/pipeline.js";
 export * from "./providers/types.js";
 export * from "./providers/domain/doh.js";
 export * from "./providers/domain/rdap.js";
@@ -8,3 +10,4 @@ export * from "./providers/ecosystem/github.js";
 export * from "./providers/ecosystem/npm.js";
 export * from "./providers/ecosystem/pypi.js";
 export * from "./providers/ecosystem/crates.js";
+export * from "./providers/serp/resolver.js";

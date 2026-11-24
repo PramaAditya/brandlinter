@@ -1,16 +1,15 @@
 import { parseArgs } from "node:util";
-import { resolveConfig, redactConfig } from "../core/config.js";
-import { sanitizeCandidates, sanitizeTld } from "../core/sanitize.js";
-import { Semaphore } from "../core/concurrency.js";
-import { checkDomain } from "../providers/domain/rdap.js";
-import { checkGitHub } from "../providers/ecosystem/github.js";
-import { checkNpm } from "../providers/ecosystem/npm.js";
-import { checkPypi } from "../providers/ecosystem/pypi.js";
-import { checkCrates } from "../providers/ecosystem/crates.js";
+import { resolveConfig, redactConfig, type SerpProviderId } from "../core/config.js";
 import {
+  runAvailabilityCheck,
+  runFullLint,
+  runSeoCheck,
+  type RegistryId,
+} from "../core/pipeline.js";
+import {
+  formatFullLintMarkdown,
+  formatSeoMarkdown,
   formatStage1Markdown,
-  formatStage1Table,
-  type Stage1CandidateResult,
 } from "./formatters.js";
 
 function printHelp(): void {
@@ -18,79 +17,32 @@ function printHelp(): void {
 
 Usage:
   brandlinter check <names...> [options]   Stage 1 fast availability check
+  brandlinter seo <names...> [options]     Stage 2 SERP collision check
+  brandlinter lint <names...> [options]    Full 2-stage funnel (Stage 1 -> Top K -> Stage 2)
   brandlinter doctor                       Inspect configuration & provider readiness
   brandlinter --help                       Show this help
 
 Options:
-  --tlds <list>         Comma-separated TLDs (default: com,dev,io,org)
-  --registries <list>   Comma-separated registries: npm,pypi,crates (default: npm,pypi)
-  --format <type>       Output format: table | markdown | json (default: table)
-  --json                Shorthand for --format json
+  --tlds <list>           Comma-separated TLDs (default: com,dev,io,org)
+  --registries <list>     Comma-separated registries: npm,pypi,crates (default: npm,pypi)
+  --niche <keywords>      Niche keywords for SEO overlap check
+  --provider <id>         SERP provider: auto|openserp|searxng|serper|brave|google-cse|exa|duckduckgo
+  --top-k <n>             Number of Stage 1 finalists to promote to Stage 2 (default: 5)
+  --format <type>         Output format: table | markdown | json (default: table)
+  --json                  Shorthand for --format json
 `);
+}
+
+function parseRegistries(raw: string): RegistryId[] {
+  return raw
+    .split(",")
+    .map((r) => r.trim().toLowerCase())
+    .filter((r): r is RegistryId => r === "npm" || r === "pypi" || r === "crates");
 }
 
 async function runDoctor(): Promise<void> {
   const cfg = resolveConfig();
-  const safe = redactConfig(cfg);
-  console.log(JSON.stringify({ status: "ok", config: safe }, null, 2));
-}
-
-async function runCheck(args: string[]): Promise<void> {
-  const { values, positionals } = parseArgs({
-    args,
-    allowPositionals: true,
-    options: {
-      tlds: { type: "string", default: "com,dev,io,org" },
-      registries: { type: "string", default: "npm,pypi" },
-      format: { type: "string", default: "table" },
-      json: { type: "boolean", default: false },
-    },
-  });
-
-  if (positionals.length === 0) {
-    console.error("Error: provide at least one candidate name.");
-    process.exitCode = 2;
-    return;
-  }
-
-  const cfg = resolveConfig();
-  const candidates = sanitizeCandidates(positionals);
-  const tlds = values.tlds.split(",").map(sanitizeTld);
-  const registries = values.registries
-    .split(",")
-    .map((r) => r.trim().toLowerCase())
-    .filter((r): r is "npm" | "pypi" | "crates" =>
-      r === "npm" || r === "pypi" || r === "crates"
-    );
-
-  const sem = new Semaphore(5);
-  const results: Stage1CandidateResult[] = await Promise.all(
-    candidates.map((name) =>
-      sem.run(async () => {
-        const [domains, github, regResults] = await Promise.all([
-          Promise.all(tlds.map((tld) => checkDomain(name, tld, cfg.dohUrl))),
-          checkGitHub(name, cfg.githubToken),
-          Promise.all(
-            registries.map((reg) => {
-              if (reg === "npm") return checkNpm(name);
-              if (reg === "pypi") return checkPypi(name);
-              return checkCrates(name);
-            })
-          ),
-        ]);
-        return { name, domains, github, registries: regResults };
-      })
-    )
-  );
-
-  const fmt = values.json ? "json" : values.format;
-  if (fmt === "json") {
-    console.log(JSON.stringify(results, null, 2));
-  } else if (fmt === "markdown") {
-    console.log(formatStage1Markdown(results));
-  } else {
-    console.log(formatStage1Table(results));
-  }
+  console.log(JSON.stringify({ status: "ok", config: redactConfig(cfg) }, null, 2));
 }
 
 async function main(): Promise<void> {
@@ -103,10 +55,60 @@ async function main(): Promise<void> {
     await runDoctor();
     return;
   }
-  if (cmd === "check") {
-    await runCheck(rest);
+
+  const { values, positionals } = parseArgs({
+    args: rest,
+    allowPositionals: true,
+    options: {
+      tlds: { type: "string", default: "com,dev,io,org" },
+      registries: { type: "string", default: "npm,pypi" },
+      niche: { type: "string", default: "" },
+      provider: { type: "string", default: "auto" },
+      "top-k": { type: "string", default: "5" },
+      format: { type: "string", default: "table" },
+      json: { type: "boolean", default: false },
+    },
+  });
+
+  if (positionals.length === 0) {
+    console.error("Error: provide at least one candidate name.");
+    process.exitCode = 2;
     return;
   }
+
+  const cfg = resolveConfig();
+  const fmt = values.json ? "json" : values.format;
+  const provider = values.provider as SerpProviderId;
+  const nicheKeywords = values.niche ? values.niche.split(/\s+/).filter(Boolean) : undefined;
+
+  if (cmd === "check") {
+    const results = await runAvailabilityCheck(positionals, cfg, {
+      tlds: values.tlds.split(","),
+      registries: parseRegistries(values.registries),
+    });
+    console.log(fmt === "json" ? JSON.stringify(results, null, 2) : formatStage1Markdown(results));
+    return;
+  }
+
+  if (cmd === "seo") {
+    const results = await runSeoCheck(positionals, cfg, { nicheKeywords, provider });
+    console.log(fmt === "json" ? JSON.stringify(results, null, 2) : formatSeoMarkdown(results));
+    return;
+  }
+
+  if (cmd === "lint") {
+    const topK = Number.parseInt(values["top-k"], 10) || 5;
+    const results = await runFullLint(positionals, cfg, {
+      tlds: values.tlds.split(","),
+      registries: parseRegistries(values.registries),
+      nicheKeywords,
+      provider,
+      topK,
+    });
+    console.log(fmt === "json" ? JSON.stringify(results, null, 2) : formatFullLintMarkdown(results));
+    return;
+  }
+
   console.error(`Unknown command: ${cmd}`);
   printHelp();
   process.exitCode = 2;

@@ -1,8 +1,9 @@
 ---
 title: "Phase 2: Pluggable SERP Providers & Scorer (TDD)"
-status: todo
+status: done
 priority: high
 created_at: 2026-11-24T12:10:02+07:00
+completed_at: 2026-11-24T12:18:00+07:00
 tags:
   - phase-2
   - serp
@@ -27,10 +28,10 @@ tags:
   - GitHub org/user taken: `-15`; primary registry taken: `-25`; primary TLD taken: `-10` each; unquoted autocorrect collision: `-20`
   - Verdicts: `CLEAN` (`80–100`), `CAUTION` (`50–79`), `CONFLICT` (`< 50` or fatal flag).
 
-## Checklist
-
-- [ ] **Red -> Green (`serp/resolver.ts`):** Define `SerpProvider` interface and test auto-detection + explicit override precedence.
-- [ ] **Red -> Green (Self-hosted SERP):** Test and implement `openserp.ts` and `searxng.ts` against recorded JSON fixtures.
-- [ ] **Red -> Green (BYOK & Fallback SERP):** Test and implement `serper.ts`, `brave.ts`, `google-cse.ts`, `exa.ts`, and `duckduckgo.ts` against mocked fixtures.
+- [x] **Red -> Green (`serp/resolver.ts`):** `SerpProvider` interface + auto-detection & override tests passing.
+- [x] **Red -> Green (Self-hosted SERP):** `openserp.ts` and `searxng.ts` tested against JSON fixtures.
+- [x] **Red -> Green (BYOK & Fallback SERP):** `serper.ts`, `brave.ts`, `google-cse.ts`, `exa.ts`, `duckduckgo.ts` tested against mocked fixtures (10 tests passing).
+- [x] **Red -> Green (`core/scorer.ts`):** Penalty rubric & verdict thresholds tested (4 tests passing).
+- [x] **CLI (`seo` & `lint`):** `src/core/pipeline.ts`, `seo` & `lint` commands built (`dist/cli.js` 36.06 KB).
 - [ ] **Red -> Green (`core/scorer.ts`):** Test penalty rubric and verdicts (`AnyDisplay` vs `anydisplay.app`, dictionary traps, 0-star vs 100-star repos).
 - [ ] **CLI (`seo` & `lint`):** Implement `brandlinter seo` and `brandlinter lint` (2-stage funnel promoting top `K` Stage 1 candidates to Stage 2).
