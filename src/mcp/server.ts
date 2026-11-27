@@ -48,7 +48,7 @@ export const LintNamesInputSchema = z.object({
 });
 
 export function createBrandlinterMcpServer(): McpServer {
-  const server = new McpServer({ name: "brandlinter", version: "0.3.0" });
+  const server = new McpServer({ name: "brandlinter", version: "0.3.1" });
 
   server.tool(
     "lint_availability",
