@@ -1,5 +1,5 @@
 <p align="center">
-  <samp>brandlinter &nbsp;·&nbsp; Stage 1 (RDAP · GitHub · Registries) &nbsp;──→&nbsp; Stage 2 (7 SERP Engines) &nbsp;──→&nbsp; Honest Verdict</samp>
+  <samp>brandlinter &nbsp;·&nbsp; Ideate (brand-naming) &nbsp;──→&nbsp; Stage 1 (RDAP · GitHub · Registries) &nbsp;──→&nbsp; Stage 2 (7 SERP Engines) &nbsp;──→&nbsp; Honest Verdict</samp>
 </p>
 
 <h1 align="center">brandlinter</h1>
@@ -7,7 +7,7 @@
 <p align="center">
   <b>Lint your product and open-source names before you ship — across Google SERPs, domains, GitHub, and package registries.</b>
   <br>
-  Pluggable CLI &amp; stdio MCP server · Node.js &ge; 20 · Zero API keys required
+  Pluggable CLI, stdio MCP server &amp; 2-skill Agent Suite · Node.js &ge; 20 · Zero API keys required
 </p>
 
 <p align="center">
@@ -83,9 +83,9 @@ npx brandlinter doctor
 
 ---
 
-## Use With Your AI Agent (MCP + Skill)
+## Use With Your AI Agent (MCP + Skill Suite)
 
-`brandlinter` follows one split: **the brain stays in your agent, the hands live in the tool.** Your agent already knows your codebase and positioning — `brandlinter` gives it live, deterministic verification over `stdio` MCP.
+`brandlinter` follows one split: **the brain stays in your agent, the hands live in the tool.** Your agent already knows your codebase and positioning — the bundled skill suite guides it from user-grounded ideation to deterministic verification over `stdio` MCP.
 
 ### 1. Add the MCP Server
 
@@ -116,19 +116,24 @@ Drop this into your MCP configuration (**Antigravity**, **OMP**, **Claude Deskto
 
 > **Windows note:** If your MCP host cannot resolve `npx` directly, use `"command": "cmd.exe"` with `"args": ["/d", "/c", "npx", "-y", "brandlinter@latest", "mcp"]`.
 
-### 2. Install the Agent Skill
+### 2. Install the Agent Skill Suite
 
-The MCP server gives your agent the tools; [`skills/brandlinter/SKILL.md`](skills/brandlinter/SKILL.md) teaches it *when and how* to use them. It keeps brainstorming conversational and grounded in real user language (no tool calls) until you ask to verify, then runs Stage 1, batches Stage 2 (`lint_seo`, max 10) in a single call, and reports the built-in verdicts verbatim.
+The MCP server gives your agent the tools; two paired Agent Skills teach it *when and how* to ideate vs. verify:
+
+| Skill | Role | What It Does |
+| :--- | :--- | :--- |
+| **[`brand-naming`](skills/brand-naming/SKILL.md)** | Ideation & Rebranding *(zero MCP calls)* | Grounds brainstorming in real user threads, explores 5 naming shapes (including everyday action phrases), applies the Reddit Comment Test, and ships an [OSS Rebrand Playbook](skills/brand-naming/references/oss-rebrand.md). |
+| **[`brandlinter`](skills/brandlinter/SKILL.md)** | Deterministic Verification | Hands off finalists into Stage 1, batches Stage 2 (`lint_seo`, max 10) in one call, catches app store/social blind spots, and reports built-in verdicts verbatim. |
 
 ```bash
-# Option A: via skills.sh / Agent Skills CLI
+# Option A: install both skills via skills.sh / Agent Skills CLI
 npx skills add PramaAditya/brandlinter
 
-# Option B: directly from npm (targets: agents | claude | omp | cursor)
+# Option B: install both skills directly from npm (targets: agents | claude | omp | cursor)
 npx brandlinter install-skill --target agents
 ```
 
-> *"Brainstorm 25 name ideas for this repo and lint them with brandlinter so we don't collide on SEO, GitHub, or npm."*
+> *"Help me brainstorm names from real user complaints for this repo, then lint the shortlist with brandlinter so we don't collide on Google, GitHub, or app stores."*
 
 <br>
 
@@ -168,7 +173,7 @@ Config loads from CLI overrides > environment > `.env` > `brandlinter.config.jso
 | `brandlinter seo <names...>` | Stage 2 SERP collision check (`--niche`, `--provider`) |
 | `brandlinter lint <names...>` | Full 2-stage funnel promoting `--top-k` finalists from Stage 1 to Stage 2 |
 | `brandlinter mcp` | Start the `stdio` MCP server (`lint_availability`, `lint_seo`, `lint_names`, `doctor`) |
-| `brandlinter install-skill` | Install bundled `SKILL.md` for `agents`, `claude`, `omp`, or `cursor` |
+| `brandlinter install-skill` | Install bundled skill suite (`brandlinter` + `brand-naming`) for `agents`, `claude`, `omp`, or `cursor` |
 | `brandlinter doctor [--no-probe]` | Inspect redacted config, warnings, and probe self-hosted SERP endpoints |
 
 Common flags: `--tlds com,dev,io,org`, `--registries npm,pypi,crates`, `--niche "keywords"`, `--provider auto|openserp|...`, `--apps`, `--social`, `--top-k 5`, `--format table|markdown|json`, `--json`.
@@ -187,7 +192,7 @@ MCP tools return a **compact signal summary** by default so a 10-name SEO batch 
 | `top` / `nicheTop` | Top 5 exact hits and top 3 niche hits (`rank`, `domain`, `title`) |
 | `fallbackFrom` | Original SERP provider when a failover engine answered |
 
-> App Store near-match detection depends on Apple's search recall. For finalists, a quick `site:apps.apple.com` web search remains a cheap sanity check.
+> App Store near-match detection depends on Apple's search recall, and Google Play is not queried by `--apps`. For mobile finalists, run quick `site:apps.apple.com` and `site:play.google.com` checks alongside manual checks for bot-blocked social platforms (Reddit/LinkedIn).
 
 <br>
 
@@ -195,7 +200,7 @@ MCP tools return a **compact signal summary** by default so a 10-name SEO batch 
 
 ## Development & Contributing
 
-Built with strict **Test-Driven Development (TDD)** using Vitest and offline mocked HTTP fixtures (104 tests across 12 suites).
+Built with strict **Test-Driven Development (TDD)** using Vitest and offline mocked HTTP fixtures (107 tests across 12 suites).
 
 ```bash
 npm install
@@ -214,7 +219,7 @@ npm run build
 ---
 
 <p align="center">
-  <a href="PLAN.md">Architecture</a> · <a href="skills/brandlinter/SKILL.md">Agent Skill</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a> · <a href="https://www.npmjs.com/package/brandlinter">npm</a>
+  <a href="PLAN.md">Architecture</a> · <a href="skills/brand-naming/SKILL.md">Naming Skill</a> · <a href="skills/brandlinter/SKILL.md">Linter Skill</a> · <a href="CONTRIBUTING.md">Contributing</a> · <a href="SECURITY.md">Security</a> · <a href="https://www.npmjs.com/package/brandlinter">npm</a>
 </p>
 
 <p align="center">

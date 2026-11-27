@@ -1,6 +1,6 @@
 {
   "name": "brandlinter",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Pluggable, agent-native CLI and MCP server for linting product and open-source names against SEO collisions, domains, GitHub, and package registries.",
   "type": "module",
   "main": "./dist/index.js",
